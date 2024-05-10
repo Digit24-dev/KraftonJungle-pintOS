@@ -27,6 +27,9 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+/* customed */
+static struct list sleep_list;
+/* customed */
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +111,9 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	/* customed */
+	list_init (&sleep_list);
+	/* customed */
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -588,3 +594,41 @@ allocate_tid (void) {
 
 	return tid;
 }
+
+/* customed */
+void thread_sleep(int64_t ticks)
+{
+	struct thread *curr = thread_current(); 		// 현재 실행중인 쓰레드의 포인터 저장
+	enum intr_level old_level;						// 인터럽트 상태 저장할 변수 선언
+
+	ASSERT (!intr_context ());						// 인터럽트 컨텍스트 여부 확인
+
+	old_level = intr_disable();						// 인터럽트 비활성화 + 이전 인터럽트 레벨을 변수에 저장
+	if (curr != idle_thread)						// 현재 쓰레드가 idle이 아닌 경우
+	{
+		curr -> wakeup_time = ticks;				// 현재 쓰레드가 깨어나야 할 시간 저장
+		list_push_back(&sleep_list, &curr -> elem); // sleep_list에 현재 쓰레드 추가
+		thread_block();								// 현재 쓰레드 블록 상태로 만듬 (block 안에 schedule 함수 호출 있음)
+	}
+	intr_set_level (old_level);						// 인터럽트를 이전 레벨로 복원
+}
+
+void thread_wakeup(int64_t ticks)
+{
+	struct list_elem *e = list_begin(&sleep_list); 				// sleep_list의 첫 번째 요소 지정
+	while (e != list_end(&sleep_list))							// sleep_list를 한번 다 돈다
+	{
+		struct thread *t = list_entry(e, struct thread, elem);	// list.h에 선언된 함수 
+																// e == elem인 thread 포인터를 t에 저장
+		if (t -> wakeup_time <= ticks)							// timer_interrupt 함수에서 전달한 tick 그대로 사용
+		{
+			e = list_remove(e);									// 해당 쓰레드 sleep_list에서 제거
+			thread_unblock(t);									// 해당 쓰레드 block 해제
+		}
+		else
+		{
+			e = list_next(e);									// 해당하지 않으면 다음 쓰레드 조사
+		}
+	}
+}
+/* customed */
