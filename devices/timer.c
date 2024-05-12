@@ -19,6 +19,9 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
+/* customed */
+static int64_t dubug_cnt = 0;
+static int64_t debug_timer_cnt = 0;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -89,12 +92,16 @@ timer_elapsed (int64_t then) {
 
 /* Suspends execution for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+timer_sleep (int64_t ticks) {				// tick (0.01 s => 10ms) 만큼 sleep 하라!
+	// int64_t start = timer_ticks ();
 
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	ASSERT (intr_get_level () == INTR_ON);	// 인터럽트 끄지 말 것.
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+
+	/* customed */
+	// if (timer_ticks() < ticks)
+	thread_sleep(timer_ticks() + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -125,7 +132,16 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_tick ();
+	thread_tick ();		// update the cpu usage for running process
+	/* customed */
+	thread_wakeup (ticks);
+	/* code to add:
+		check sleep list and the global tick.
+		find any threads to wake up.
+		move them to the ready list if neccessary.
+		update the global tick
+	 */
+	//	sleep_list --- a thread ---> ready_list
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
