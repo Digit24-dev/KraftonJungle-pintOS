@@ -192,11 +192,8 @@ lock_acquire (struct lock *lock) {
 
 	/* customed */
 	thread_current()->wait_on_lock = lock;
-	lock->holder->donations = &thread_current()->d_elem;
-	donate(lock, thread_current()->priority);
 	sema_down (&lock->semaphore);
 	thread_current()->wait_on_lock = NULL;
-	/* customed */
 	lock->holder = thread_current ();
 }
 
@@ -335,12 +332,6 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 /* customed */
 void donate(struct lock *lock, int priority)
 {
-	struct lock *p;
-	while (lock->holder->wait_on_lock != NULL)
-	{
-		lock = lock->holder->wait_on_lock;
-	}
-
 	if (lock->holder->priority < priority)
 		lock->holder->priority = priority;
 }
