@@ -93,7 +93,10 @@ struct thread {
 	int priority;                       /* Priority. */
 	/* customed */
 	int64_t wakeup_time;				/* Wake up time for sleeping thread*/
-	/* customed */
+	/* customed 0512*/
+	struct lock *wait_on_lock;
+	struct list_elem *donations;
+	struct list_elem d_elem;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -144,5 +147,11 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
+bool list_higher_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+void preemption();
 
 #endif /* threads/thread.h */

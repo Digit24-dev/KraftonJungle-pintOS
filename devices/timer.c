@@ -97,10 +97,7 @@ timer_sleep (int64_t ticks) {
 	// 	thread_yield ();
 
 	/* customed */
-	enum intr_level old_level = intr_disable();		// 인터럽트 상태 저장할 변수 선언
-	thread_sleep(timer_ticks() + ticks);
-	intr_set_level(old_level);
-	
+	thread_sleep(timer_ticks() + ticks);			// global ticks + 현재 쓰레드의 tick을 wakeup_time 인자로 넣으려고
 }
 
 /* Suspends execution for approximately MS milliseconds. */
