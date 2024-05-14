@@ -94,9 +94,10 @@ struct thread {
 	/* customed */
 	int64_t wakeup_time;				/* Wake up time for sleeping thread*/
 	/* customed 0512*/
-	struct lock *wait_on_lock;
-	struct list_elem *donations;
+	struct lock *wait_on_lock;			/* 현재 쓰레드가 기다리고 있는 lock */
+	struct list *donations;				/* 기부받은 우선순위 목록 */
 	struct list_elem d_elem;
+	int original_priority;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 

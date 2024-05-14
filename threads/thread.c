@@ -27,7 +27,7 @@
 /* customed */
 static struct list sleep_list;
 static int64_t global_min_ttw = INT64_MAX; /* global minimum time to wakeup tick */
-static bool wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool  wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 void preemption();
 
 /* List of processes in THREAD_READY state, that is, processes
@@ -216,8 +216,9 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-
+	
 	/* Add to run queue. */
+	
 	thread_unblock (t);
 
 	/* customed */
@@ -441,9 +442,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	/* customed */
-	t->wakeup_time = 0;
+	t-> wakeup_time = 0;
 	t->donations = NULL;
+	
 	t->wait_on_lock = NULL;
+	t->original_priority = priority;
+	
 	
 	t->magic = THREAD_MAGIC;
 }
@@ -646,10 +650,10 @@ thread_sleep(int64_t tick) {
 	ASSERT (!intr_context ());
 
 	if (cur->status != idle_thread) {
-		cur->wakeup_time = tick;
+		cur-> wakeup_time = tick;
 		old_level = intr_disable();
 		// list_push_back(&sleep_list, &cur->elem);
-		list_insert_ordered(&sleep_list, &cur->elem, wakeup_time_less, NULL);
+		list_insert_ordered(&sleep_list, &cur->elem,  wakeup_time_less, NULL);
 		thread_block();
 		intr_set_level(old_level);
 	}
@@ -664,7 +668,7 @@ thread_wakeup(int64_t tick) {
 	{
 		struct thread *t = list_entry(e, struct thread, elem);
 
-		if (t->wakeup_time <= tick) {
+		if (t-> wakeup_time <= tick) {
 			old_level = intr_disable();
 			list_pop_front(&sleep_list);
 			intr_set_level(old_level);
@@ -686,7 +690,7 @@ wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_,
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
   
-  return a->wakeup_time < b->wakeup_time;
+  return a-> wakeup_time < b-> wakeup_time;
 }
 
 bool
