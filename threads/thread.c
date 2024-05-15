@@ -342,7 +342,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->original_priority = new_priority;
-	thread_current ()->priority = new_priority;
+	update_priority(thread_current());
 	/* customed */
 	preemption();
 	/* customed */

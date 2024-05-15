@@ -198,18 +198,20 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!lock_held_by_current_thread (lock));
 	
 	/* customed */
-	thread_current()->wait_on_lock = lock;
+	struct thread *curr = thread_current();
 	enum intr_level old_level = intr_disable();
-	if (lock -> holder != NULL)
+	
+	if (lock -> holder != NULL && curr->priority > lock->holder->priority)
 	{
-		donate(thread_current()); 
+		curr->wait_on_lock = lock;
+		list_insert_ordered(&lock->holder->donations, &curr->d_elem, list_higher_priority, NULL);
+		donate(curr); 
 	}
 	intr_set_level(old_level);
 
-	sema_down (&lock->semaphore);
-	thread_current()->wait_on_lock = NULL;
-	lock->holder = thread_current ();
-
+	sema_down (&lock->semaphore); //
+	curr->wait_on_lock = NULL;
+	lock->holder = curr;
 }
 
 
@@ -245,24 +247,27 @@ lock_release (struct lock *lock) {
 
 	/* customed */
 	enum intr_level old_level = intr_disable ();
-	struct thread *t = thread_current();
-	t -> priority = t -> original_priority;
-
-	// donation list 확인하여 original_priority보다 높은게 있으면 업데이트
-	if (!list_empty(&t->donations))
+	lock->holder = NULL;
+	
+	// donation_list에서 제거
+	struct thread *curr = thread_current();
+	struct list_elem *donator_number;
+	for (donator_number = list_begin(&curr->donations); donator_number != list_end(&curr->donations);)
 	{
-		list_remove(&t->d_elem);
-		if (!list_empty(&t->donations))
+		struct thread *front = list_entry(donator_number, struct thread, d_elem);
+		if (front->wait_on_lock == lock)
 		{
-			struct thread *first_thread_in_donations = list_entry(list_front(&t->donations), struct thread, d_elem);
-			if (first_thread_in_donations->priority > t->priority)
-			{
-				t->priority = first_thread_in_donations->priority;
-			}
+			donator_number = list_remove(donator_number);
+		}
+		else
+		{
+			donator_number = list_next(donator_number);
 		}
 	}
+	
+	// donations_list 정렬 이후 우선순위 비교해서 교환
+	update_priority();
 
-	lock->holder = NULL;
 	intr_set_level(old_level);
 	sema_up (&lock->semaphore);
 }
@@ -386,25 +391,25 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 /* customed */
 void donate(struct thread *t)
 {	
-	int cnt = 0;
-	
-	while (t -> wait_on_lock != NULL && t -> wait_on_lock -> holder != NULL && cnt < 8)
+	while (t -> wait_on_lock != NULL && t -> wait_on_lock -> holder != NULL && t->priority > t->wait_on_lock->holder->priority)
 	{
-		struct thread *holder = t -> wait_on_lock -> holder;
-		if (t -> priority > holder -> priority)
-		{
-			holder -> priority = t -> priority;
-			if (holder -> donations != NULL)
-			{
-				list_insert_ordered(holder->donations, &t->d_elem, d_list_higher_priority, NULL);
-			}
-			t = holder;
-			cnt += 1;
-		}
-		else
-		{
-			break;
-		}
+		t->wait_on_lock->holder->priority = t->priority;
+		t = t->wait_on_lock->holder;
 	}
+}
+
+void update_priority()
+{
+    struct thread *curr = thread_current();
+    curr -> priority = curr -> original_priority;
+    if (!list_empty(&curr->donations))
+    {
+		list_sort(&curr->donations, list_higher_priority, NULL);
+        struct thread *front = list_entry(list_front(&curr->donations), struct thread, d_elem);
+        if (front->priority > curr->priority)
+        {
+            curr->priority = front->priority;
+        }
+    }
 }
 /* customed */

@@ -95,7 +95,7 @@ struct thread {
 	int64_t wakeup_time;				/* Wake up time for sleeping thread*/
 	/* customed 0512*/
 	struct lock *wait_on_lock;			/* 현재 쓰레드가 기다리고 있는 lock */
-	struct list *donations;				/* 기부받은 우선순위 목록 */
+	struct list donations;				/* 기부받은 우선순위 목록 */
 	struct list_elem d_elem;
 	int original_priority;
 	/* Shared between thread.c and synch.c. */
@@ -152,7 +152,7 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 bool list_higher_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-static bool time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 void preemption();
 
 bool
