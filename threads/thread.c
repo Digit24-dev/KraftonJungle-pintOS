@@ -341,6 +341,7 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	thread_current ()->original_priority = new_priority;
 	thread_current ()->priority = new_priority;
 	/* customed */
 	preemption();
@@ -443,7 +444,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	/* customed */
 	t-> wakeup_time = 0;
-	t->donations = NULL;
+	list_init(&t->donations);
 	
 	t->wait_on_lock = NULL;
 	t->original_priority = priority;
@@ -703,14 +704,23 @@ list_higher_priority (const struct list_elem *a_, const struct list_elem *b_,
   return a->priority > b->priority;
 }
 
+bool
+d_list_higher_priority (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, d_elem);
+  const struct thread *b = list_entry (b_, struct thread, d_elem);
+  
+  return a->priority > b->priority;
+}
+
 void preemption()
 {
 	enum intr_level old_level = intr_disable();
 	list_sort(&ready_list, list_higher_priority, NULL);
 
 	struct thread *cur = thread_current();
-	if (!list_empty(&ready_list) && cur->priority < list_entry(list_front(&ready_list)
-														, struct thread, elem)->priority)
+	if (!list_empty(&ready_list) && cur->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
 	{
 		thread_yield();
 	}

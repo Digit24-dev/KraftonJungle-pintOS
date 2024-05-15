@@ -155,4 +155,8 @@ bool list_higher_priority(const struct list_elem *a_, const struct list_elem *b_
 static bool time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 void preemption();
 
+bool
+d_list_higher_priority (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
+
 #endif /* threads/thread.h */
