@@ -36,6 +36,7 @@
 
 void update();
 static void donate();
+bool sema_elem_func(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -313,13 +314,6 @@ cond_init (struct condition *cond) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-bool
-sema_elem_func(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED){
-	const struct thread *a = list_entry(a_, struct semaphore_elem, elem)->holder;
-	const struct thread *b = list_entry(b_, struct semaphore_elem, elem)->holder;
-
-	return a->priority > b->priority;
-}
 
 void
 cond_wait (struct condition *cond, struct lock *lock) {
@@ -383,6 +377,14 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 }
 
 /* customed */
+bool
+sema_elem_func(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED){
+	const struct thread *a = list_entry(a_, struct semaphore_elem, elem)->holder;
+	const struct thread *b = list_entry(b_, struct semaphore_elem, elem)->holder;
+
+	return a->priority > b->priority;
+}
+
 void update()
 {
 	thread_current()->priority = thread_current()->original_priority;
