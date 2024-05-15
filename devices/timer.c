@@ -22,6 +22,7 @@ static int64_t ticks;
 /* customed */
 static int64_t dubug_cnt = 0;
 static int64_t debug_timer_cnt = 0;
+static int64_t global_wakeup_tick = __INT64_MAX__;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -135,12 +136,6 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();		// update the cpu usage for running process
 	/* customed */
 	thread_wakeup (ticks);
-	/* code to add:
-		check sleep list and the global tick.
-		find any threads to wake up.
-		move them to the ready list if neccessary.
-		update the global tick
-	 */
 	//	sleep_list --- a thread ---> ready_list
 }
 
@@ -200,3 +195,13 @@ real_time_sleep (int64_t num, int32_t denom) {
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
 	}
 }
+
+/* customed */
+int64_t get_global_wakeup_tick() {
+	return global_wakeup_tick;
+}
+
+void set_global_wakeup_tick(int64_t set) {
+	global_wakeup_tick = MIN(set, global_wakeup_tick);
+}
+/* customed */
