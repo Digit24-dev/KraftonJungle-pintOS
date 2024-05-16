@@ -650,7 +650,6 @@ thread_sleep(int64_t tick) {
 	if (cur->status != idle_thread) {
 		cur->time_to_wakeup = tick;
 		old_level = intr_disable();
-		// list_push_back(&sleep_list, &cur->elem);
 		list_insert_ordered(&sleep_list, &cur->elem, time_to_wakeup_less, NULL);
 		thread_block();
 		intr_set_level(old_level);
