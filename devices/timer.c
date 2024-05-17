@@ -8,6 +8,9 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 
+/* customed 0517*/
+bool thread_mlfqs;
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -129,6 +132,22 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+	
+	/* customed 0517 */
+	if (thread_mlfqs)
+	{
+		// 100틱(1초)마다 recent_cpu, load_avg update
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+			
+		}
+
+		// 4틱마다 모든 쓰레드 priority update
+		if (timer_ticks() % 4 == 0)
+		{
+
+		}
+	}
 
 	/* customed */
 	thread_wakeup(ticks);

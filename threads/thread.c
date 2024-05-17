@@ -30,6 +30,9 @@ static int64_t global_min_ttw = INT64_MAX; /* global minimum time to wakeup tick
 static bool  wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 void preemption();
 
+/* customed 0517 */
+static struct list all_list;
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -72,6 +75,9 @@ static tid_t allocate_tid (void);
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 int64_t get_thread_ttw_tick();
+
+/* 0516 customed */
+int load_avg = 0;
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -121,6 +127,8 @@ thread_init (void) {
 	list_init (&destruction_req);
 	/* customed */
 	list_init (&sleep_list);
+	/* customed 0517 */
+	list_init (&all_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -151,7 +159,10 @@ thread_start (void) {
 void
 thread_tick (void) {
 	struct thread *t = thread_current ();
-
+	
+	/* customed 0517 */
+	t->recent_cpu ++;
+	
 	/* Update statistics. */
 	if (t == idle_thread)
 		idle_ticks++;
@@ -218,8 +229,10 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 	
 	/* Add to run queue. */
-	
 	thread_unblock (t);
+
+	/* customed 0517 */
+	list_push_back(&all_list, &t->elem);
 
 	/* customed */
 	/* priority scheduler
@@ -341,11 +354,15 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->original_priority = new_priority;
-	update_priority(thread_current());
-	/* customed */
-	preemption();
-	/* customed */
+	/* customed 0516 */
+	if (!thread_mlfqs)
+	{
+		thread_current ()->original_priority = new_priority;
+		update_priority(thread_current());
+		/* customed */
+		preemption();
+		/* customed */
+	}
 }
 
 /* Returns the current thread's priority. */
@@ -357,28 +374,29 @@ thread_get_priority (void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
-	/* TODO: Your implementation goes here */
+	/* customed 0516 */
+	thread_current()->nice = nice;
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	/* customed 0516 */
+	return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	/* customed 0516 */
+	return load_avg*100;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	/* customed 0516 */
+	return thread_current()->recent_cpu*100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -445,12 +463,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* customed */
 	t-> wakeup_time = 0;
 	list_init(&t->donations);
-	
 	t->wait_on_lock = NULL;
 	t->original_priority = priority;
-	
-	
 	t->magic = THREAD_MAGIC;
+	/* customed 0516 */
+	t->recent_cpu = 0;
+	t->nice = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -726,4 +744,5 @@ void preemption()
 	}
 	intr_set_level(old_level);
 }
-/* customed */
+
+/* customed 0516*/

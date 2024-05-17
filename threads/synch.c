@@ -192,26 +192,29 @@ lock_init (struct lock *lock) {
    we need to sleep. */
 void
 lock_acquire (struct lock *lock) {
-	
-	ASSERT (lock != NULL);
-	ASSERT (!intr_context ());
-	ASSERT (!lock_held_by_current_thread (lock));
-	
-	/* customed */
-	struct thread *curr = thread_current();
-	enum intr_level old_level = intr_disable();
-	
-	if (lock -> holder != NULL && curr->priority > lock->holder->priority)
+	/* customed 0516 */
+	if (!thread_mlfqs)
 	{
-		curr->wait_on_lock = lock;
-		list_insert_ordered(&lock->holder->donations, &curr->d_elem, list_higher_priority, NULL);
-		donate(curr); 
-	}
-	intr_set_level(old_level);
+		ASSERT (lock != NULL);
+		ASSERT (!intr_context ());
+		ASSERT (!lock_held_by_current_thread (lock));
+		
+		/* customed */
+		struct thread *curr = thread_current();
+		enum intr_level old_level = intr_disable();
+		
+		if (lock -> holder != NULL && curr->priority > lock->holder->priority)
+		{
+			curr->wait_on_lock = lock;
+			list_insert_ordered(&lock->holder->donations, &curr->d_elem, list_higher_priority, NULL);
+			donate(curr); 
+		}
+		intr_set_level(old_level);
 
-	sema_down (&lock->semaphore); //
-	curr->wait_on_lock = NULL;
-	lock->holder = curr;
+		sema_down (&lock->semaphore); //
+		curr->wait_on_lock = NULL;
+		lock->holder = curr;
+	}
 }
 
 
@@ -242,34 +245,38 @@ lock_try_acquire (struct lock *lock) {
    handler. */
 void
 lock_release (struct lock *lock) {
-	ASSERT (lock != NULL);
-	ASSERT (lock_held_by_current_thread (lock));
-
-	/* customed */
-	enum intr_level old_level = intr_disable ();
-	lock->holder = NULL;
-	
-	// donation_list에서 제거
-	struct thread *curr = thread_current();
-	struct list_elem *donator_number;
-	for (donator_number = list_begin(&curr->donations); donator_number != list_end(&curr->donations);)
+	/* customed 0516 */
+	if (!thread_mlfqs)
 	{
-		struct thread *front = list_entry(donator_number, struct thread, d_elem);
-		if (front->wait_on_lock == lock)
-		{
-			donator_number = list_remove(donator_number);
-		}
-		else
-		{
-			donator_number = list_next(donator_number);
-		}
-	}
-	
-	// donations_list 정렬 이후 우선순위 비교해서 교환
-	update_priority();
+		ASSERT (lock != NULL);
+		ASSERT (lock_held_by_current_thread (lock));
 
-	intr_set_level(old_level);
-	sema_up (&lock->semaphore);
+		/* customed */
+		enum intr_level old_level = intr_disable ();
+		lock->holder = NULL;
+		
+		// donation_list에서 제거
+		struct thread *curr = thread_current();
+		struct list_elem *donator_number;
+		for (donator_number = list_begin(&curr->donations); donator_number != list_end(&curr->donations);)
+		{
+			struct thread *front = list_entry(donator_number, struct thread, d_elem);
+			if (front->wait_on_lock == lock)
+			{
+				donator_number = list_remove(donator_number);
+			}
+			else
+			{
+				donator_number = list_next(donator_number);
+			}
+		}
+		
+		// donations_list 정렬 이후 우선순위 비교해서 교환
+		update_priority();
+
+		intr_set_level(old_level);
+		sema_up (&lock->semaphore);
+	}
 }
 
 /* Returns true if the current thread holds LOCK, false
