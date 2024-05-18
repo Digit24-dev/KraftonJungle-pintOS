@@ -7,8 +7,8 @@
 #include "threads/io.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/fixed_point.h"
 
-/* customed 0517*/
 bool thread_mlfqs;
 
 /* See [8254] for hardware details of the 8254 timer chip. */
@@ -133,19 +133,22 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
 	
-	/* customed 0517 */
+	/* ====================== customed for advanced ======================*/
 	if (thread_mlfqs)
 	{
+		// 1틱마다 recent_cpu 1씩 증가
+		recent_cpu_add_1();
 		// 100틱(1초)마다 recent_cpu, load_avg update
 		if (timer_ticks() % TIMER_FREQ == 0)
 		{
-			
+			calculate_load_avg();
+			recalculate_recent_cpu();
 		}
 
 		// 4틱마다 모든 쓰레드 priority update
 		if (timer_ticks() % 4 == 0)
 		{
-
+			recalculate_priority();
 		}
 	}
 

@@ -69,7 +69,7 @@ sema_down (struct semaphore *sema) {
 		/* customed */
 		// list_push_back (&sema->waiters, &thread_current ()->elem);
 		list_insert_ordered(&sema->waiters, &thread_current()->elem, list_higher_priority, NULL);
-		/* customed */
+		
 		thread_block ();
 	}
 	sema->value--;
@@ -192,29 +192,25 @@ lock_init (struct lock *lock) {
    we need to sleep. */
 void
 lock_acquire (struct lock *lock) {
-	/* customed 0516 */
+	ASSERT (lock != NULL);
+	ASSERT (!intr_context ());
+	ASSERT (!lock_held_by_current_thread (lock));
+		
+	struct thread *curr = thread_current();
+
+	/* ====================== customed for advanced ======================*/
 	if (!thread_mlfqs)
-	{
-		ASSERT (lock != NULL);
-		ASSERT (!intr_context ());
-		ASSERT (!lock_held_by_current_thread (lock));
-		
-		/* customed */
-		struct thread *curr = thread_current();
-		enum intr_level old_level = intr_disable();
-		
+	{	
 		if (lock -> holder != NULL && curr->priority > lock->holder->priority)
 		{
 			curr->wait_on_lock = lock;
 			list_insert_ordered(&lock->holder->donations, &curr->d_elem, list_higher_priority, NULL);
 			donate(curr); 
 		}
-		intr_set_level(old_level);
-
-		sema_down (&lock->semaphore); //
-		curr->wait_on_lock = NULL;
-		lock->holder = curr;
 	}
+	sema_down (&lock->semaphore); //
+	lock->holder = curr;
+	curr->wait_on_lock = NULL;
 }
 
 
@@ -245,15 +241,13 @@ lock_try_acquire (struct lock *lock) {
    handler. */
 void
 lock_release (struct lock *lock) {
-	/* customed 0516 */
+	ASSERT (lock != NULL);
+	ASSERT (lock_held_by_current_thread (lock));
+
+	/* ====================== customed for advanced ======================*/
 	if (!thread_mlfqs)
 	{
-		ASSERT (lock != NULL);
-		ASSERT (lock_held_by_current_thread (lock));
-
-		/* customed */
 		enum intr_level old_level = intr_disable ();
-		lock->holder = NULL;
 		
 		// donation_list에서 제거
 		struct thread *curr = thread_current();
@@ -275,8 +269,9 @@ lock_release (struct lock *lock) {
 		update_priority();
 
 		intr_set_level(old_level);
-		sema_up (&lock->semaphore);
 	}
+		lock->holder = NULL;
+		sema_up (&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false
