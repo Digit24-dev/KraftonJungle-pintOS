@@ -899,6 +899,7 @@ bool cmp_donation_priority(const struct list_elem *a,
     struct thread *st_b = list_entry(b, struct thread, d_elem);
     return st_a->priority > st_b->priority;
 }
+
 /*
 void preemption()
 {
@@ -971,7 +972,7 @@ void mlfqs_priority (struct thread *t )
 		// t->priority = PRI_MAX - fptoi_r(fp_sub(fp_div2(t->recent_cpu, 4), fp_multi2(t->nice, 2)));
 
 		/****/
-		t->priority = PRI_MAX - fptoi_r(fp_div2(t->recent_cpu, 4) - fp_multi2(t->nice, 2));
+		t->priority = PRI_MAX - fptoi_r(fp_div2(t->recent_cpu, 4) - t->nice*2);
 	}
 
 }
@@ -982,8 +983,8 @@ void mlfqs_recent_cpu (struct thread *t)
 	//
 	if (t == idle_thread) return;
 	t->recent_cpu = fp_add2 (		// fp_add
-	fp_multi2 (fp_div (fp_multi (load_avg, 2), 
-	fp_add (fp_multi (load_avg, 2), 1)), 
+	fp_multi2 (fp_div (fp_multi2 (load_avg, 2), 
+	fp_add2 (fp_multi2 (load_avg, 2), 1)), 
 	t->recent_cpu), t->nice);
 	//
 

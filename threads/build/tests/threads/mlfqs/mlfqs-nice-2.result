@@ -1,0 +1,11 @@
+FAIL
+Kernel panic in run: PANIC at ../../threads/synch.c:195 in lock_acquire(): assertion `!lock_held_by_current_thread (lock)' failed.
+Call stack: 0x8004214152 0x800420a6ff 0x800420ba42 0x800420bb46 0x800420cbc5 0x8004206232 0x80042060a3
+Translation of call stack:
+0x0000008004214152: debug_panic (lib/kernel/debug.c:32)
+0x000000800420a6ff: lock_acquire (threads/synch.c:204)
+0x000000800420ba42: palloc_get_multiple (threads/palloc.c:267 (discriminator 4))
+0x000000800420bb46: palloc_get_page (threads/palloc.c:297)
+0x000000800420cbc5: pml4e_walk (threads/mmu.c:73)
+0x0000008004206232: paging_init (threads/init.c:162)
+0x00000080042060a3: main (threads/init.c:96)

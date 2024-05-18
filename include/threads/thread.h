@@ -93,12 +93,28 @@ struct thread {
 	int priority;                       /* Priority. */
 	/* customed */
 	int64_t time_to_wakeup; 			/* time to wakeup */
+
+	/**/	
+	int init_priority;
+	
 	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
-	struct list_elem *donations;		/* donations that points d_elem donors. */
+	/**/
+	struct list donations;		/* donations that points d_elem donors. */
+
 	struct list_elem d_elem;			/* List donors element. */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+
+	struct list_elem mlfqs_elem;
+
+
+	int nice; //?
+	int recent_cpu; //?
+
+	int load_avg;
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -152,4 +168,32 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
+bool cmp_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+
+void test_max_priority (void);
+
+void donate_priority (void);//(struct lock *lock, int priority);
+
+void remove_donor(struct lock *lock);
+
+void update_priority_before_donations(void);
+
+bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+
+void preemption(void);
+
+void mlfqs_increment (void);
+void mlfqs_load_avg (void);
+void mlfqs_recent_cpu (struct thread *t);
+void mlfqs_priority (struct thread *t );
+
+extern bool thread_mlfqs;
+
 #endif /* threads/thread.h */
+
+
+
+
+
+

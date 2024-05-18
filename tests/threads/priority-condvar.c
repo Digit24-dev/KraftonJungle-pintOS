@@ -38,6 +38,9 @@ test_priority_condvar (void)
       lock_acquire (&lock);
       msg ("Signaling...");
       cond_signal (&condition, &lock);
+
+      // return cond_signal (&condition, &lock);
+
       lock_release (&lock);
     }
 }
@@ -48,6 +51,9 @@ priority_condvar_thread (void *aux UNUSED)
   msg ("Thread %s starting.", thread_name ());
   lock_acquire (&lock);
   cond_wait (&condition, &lock);
+
+  // return cond_wait (&condition, &lock);
+
   msg ("Thread %s woke up.", thread_name ());
   lock_release (&lock);
 }
