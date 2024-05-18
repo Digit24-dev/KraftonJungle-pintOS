@@ -7,6 +7,9 @@
 #include "threads/io.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/fixed_point.h"
+
+bool thread_mlfqs;
 
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -97,10 +100,7 @@ timer_sleep (int64_t ticks) {
 	// 	thread_yield ();
 
 	/* customed */
-	enum intr_level old_level = intr_disable();		// 인터럽트 상태 저장할 변수 선언
-	thread_sleep(timer_ticks() + ticks);
-	intr_set_level(old_level);
-	
+	thread_sleep(timer_ticks() + ticks);			// global ticks + 현재 쓰레드의 tick을 wakeup_time 인자로 넣으려고
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -132,6 +132,25 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+	
+	/* ====================== customed for advanced ======================*/
+	if (thread_mlfqs)
+	{
+		// 1틱마다 recent_cpu 1씩 증가
+		recent_cpu_add_1();
+		// 100틱(1초)마다 recent_cpu, load_avg update
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+			calculate_load_avg();
+			recalculate_recent_cpu();
+		}
+
+		// 4틱마다 모든 쓰레드 priority update
+		if (timer_ticks() % 4 == 0)
+		{
+			recalculate_priority();
+		}
+	}
 
 	/* customed */
 	thread_wakeup(ticks);

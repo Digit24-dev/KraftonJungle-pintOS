@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/fixed_point.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -93,9 +94,18 @@ struct thread {
 	int priority;                       /* Priority. */
 	/* customed */
 	int64_t wakeup_time;				/* Wake up time for sleeping thread*/
-	/* customed */
+	/* customed 0512*/
+	struct lock *wait_on_lock;			/* 현재 쓰레드가 기다리고 있는 lock */
+	struct list donations;				/* 기부받은 우선순위 목록 */
+	struct list_elem d_elem;
+	int original_priority;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem a_elem;
+
+	/* customed 0516 */
+	int nice;
+	int recent_cpu;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -144,5 +154,22 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
+bool list_higher_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+void preemption(void);
+
+void calculate_load_avg(void);
+void calculate_recent_cpu(struct thread *t);
+void calculate_priority(struct thread *t);
+void recalculate_recent_cpu(void);
+void recalculate_priority(void);
+void recent_cpu_add_1(void);
+
+bool
+d_list_higher_priority (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
 
 #endif /* threads/thread.h */
