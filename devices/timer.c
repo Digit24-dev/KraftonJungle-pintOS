@@ -7,6 +7,7 @@
 #include "threads/io.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/fp-ops.h"
 
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -20,8 +21,6 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 /* customed */
-static int64_t dubug_cnt = 0;
-static int64_t debug_timer_cnt = 0;
 static int64_t global_wakeup_tick = __INT64_MAX__;
 
 /* Number of loops per timer tick.
@@ -134,9 +133,26 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();		// update the cpu usage for running process
-	/* customed */
+	
+	/* advanced */
+	if (thread_mlfqs) 
+	{
+		/* increase recent_cpu */
+		recent_cpu_add_1();
+
+		if (timer_ticks() % 4 == 0)
+		{
+			recalculate_priority();
+		}
+
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+			calculate_load_avg();
+			recalculate_recent_cpu();
+		}
+	}
+	
 	thread_wakeup (ticks);
-	//	sleep_list --- a thread ---> ready_list
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

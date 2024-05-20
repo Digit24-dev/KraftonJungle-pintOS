@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/fp-ops.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -98,6 +99,10 @@ struct thread {
 	struct list donations;				/* donations that points d_elem donors. */
 	struct list_elem d_elem;			/* List donors element. */
 
+	int nice;							/* nice fields */
+	fp_float recent_cpu;				/* recent_cpu  */
+	struct list_elem adv_elem;			/* for list all threads */
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -150,10 +155,14 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 /* customed */
-void thread_up();
+void calculate_recent_cpu(struct thread *t);
+void recent_cpu_add_1();
+void recalculate_priority();
+void recalculate_recent_cpu();
+void calculate_priority(struct thread *t);
+void calculate_load_avg();
 void preemption();
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-bool donation_list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 #endif /* threads/thread.h */

@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/fp-ops.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -27,6 +28,12 @@
 /* customed */
 static struct list sleep_list;
 static int64_t global_min_ttw = INT64_MAX; /* global minimum time to wakeup tick */
+
+/* advanced */
+static fp_float load_avg = 0;
+struct list all_thread_list;
+/* advanced */
+
 void preemption();
 static bool time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
@@ -121,12 +128,15 @@ thread_init (void) {
 	list_init (&destruction_req);
 	/* customed */
 	list_init (&sleep_list);
+	/* advanced */
+	list_init (&all_thread_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
+	list_push_back(&all_thread_list, &initial_thread->adv_elem);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -217,6 +227,9 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	/* advanced */
+	list_push_back(&all_thread_list, &t->adv_elem);
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -227,8 +240,6 @@ thread_create (const char *name, int priority,
 	*/
 	if (thread_current()->priority < t->priority)
 		thread_yield();
-	// preemption();
-	/* customed */
 
 	return tid;
 }
@@ -313,6 +324,7 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
+	list_remove(&thread_current()->adv_elem);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -341,9 +353,11 @@ void
 thread_set_priority (int new_priority) {
 	/* customed */
 	thread_current ()->priority = new_priority;
-	thread_current ()->original_priority = new_priority; // priority를 변경하는 것은 도네이션 받은 것을 변경하는 것일 수도 있음. -> original priority 를 수정해야함.
-	update();
-	preemption();
+	if (!thread_mlfqs) {
+		thread_current ()->original_priority = new_priority; // priority를 변경하는 것은 도네이션 받은 것을 변경하는 것일 수도 있음. -> original priority 를 수정해야함.
+		update();
+		preemption();
+	}
 	/* customed */
 }
 
@@ -357,27 +371,34 @@ thread_get_priority (void) {
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
+	thread_current()->nice = nice;
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level = intr_disable();
+	int ret = fptoi(fp_multi2(load_avg, 100));
+	intr_set_level(old_level);
+	return ret;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level = intr_disable();
+	int ret = fptoi(fp_multi2(thread_current()->recent_cpu, 100));
+	intr_set_level(old_level);
+	return ret;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -446,7 +467,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->time_to_wakeup = 0;
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
-	
+	/* advanced */
+	t->nice = 0;
+	t->recent_cpu = 0;
+
 	t->magic = THREAD_MAGIC;
 }
 
@@ -629,22 +653,11 @@ allocate_tid (void) {
 }
 
 /* customed */
-static int64_t debug_sleep_cnt = 0;
-static int64_t debug_wakeup_cnt = 0;
-
 void
 thread_sleep(int64_t tick) {
 	struct thread* cur = thread_current();
 	enum intr_level old_level;
-	/* 
-		if the current thread is not idle thread,
-		change the state of the caller thread to BLOCKED,
-		store the local tick to wake up,
-		update the global tick if necessary,
-		and call schedule()
-
-		should disable interrupt
-	*/
+	
 	ASSERT (!intr_context ());
 
 	if (cur->status != idle_thread) {
@@ -714,3 +727,65 @@ void preemption()
 	intr_set_level(old_level);
 }
 /* customed */
+
+/* advanced */
+void calculate_load_avg(void)
+{
+    int ready_threads = list_size(&ready_list);
+    if (thread_current() != idle_thread)
+    {
+        ready_threads += 1;
+    }
+    load_avg = fp_add(fp_div2(fp_multi2(load_avg, 59), 60), fp_div2(itofp(ready_threads), 60));
+	// load_avg = fp_add(fp_multi(fp_div2(itofp(59), 60), load_avg), fp_multi2(fp_div2(itofp(1), 60), ready_threads));
+}
+
+void calculate_priority(struct thread *t)
+{
+    if (t != idle_thread)
+    {
+        t->priority = PRI_MAX - fptoi_r(fp_add2(fp_div2(t->recent_cpu, 4), (t->nice * 2)));
+    }
+}
+
+void recalculate_recent_cpu(void)
+{
+    struct list_elem *e;
+    for (e = list_begin(&all_thread_list); e != list_end(&all_thread_list); e = list_next(e))
+    {
+        struct thread *t = list_entry(e, struct thread, adv_elem);
+        calculate_recent_cpu(t);
+    }
+}
+
+void calculate_recent_cpu(struct thread *t)
+{
+    if (t != idle_thread)
+    {
+        fp_float decay = fp_div(fp_multi2(load_avg, 2), fp_add2(fp_multi2(load_avg, 2), 1));
+        t->recent_cpu  = fp_add2(fp_multi(decay, t->recent_cpu), t->nice);
+    }
+}
+
+void recalculate_priority(void)
+{
+    struct list_elem *e;
+    if (!list_empty(&all_thread_list))
+    {
+        for (e = list_begin(&all_thread_list); e != list_end(&all_thread_list); e = list_next(e))
+        {
+            struct thread *t = list_entry(e, struct thread, adv_elem);
+            calculate_priority(t);
+        }
+    }
+}
+
+void recent_cpu_add_1(void)
+{
+    struct thread *curr = thread_current();
+    if (curr != idle_thread)
+    {
+        curr->recent_cpu = fp_add2(curr->recent_cpu, 1);
+    }
+}
+/* advanced */
