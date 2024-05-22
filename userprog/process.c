@@ -50,6 +50,12 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	/* customed 0521 */
+	// Parse command line and get program name
+	char *save_ptr;
+
+	strtok_r(file_name, " ", &save_ptr);
+	
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -162,9 +168,8 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
+	char *file_name = f_name;	
 	bool success;
-
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -184,6 +189,7 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -204,7 +210,14 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	return -1;
+	/* customed 0521 */
+	while (1)
+	{
+		if (child_tid == NULL)
+		{
+			return -1;
+		}
+	}
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -329,6 +342,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	/* customed 0522 */
+	char *save_ptr;
+	char *token_1;
+
+	token_1 = strtok_r(file_name, " ", &save_ptr);
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -336,9 +355,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (token_1);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", token_1);
 		goto done;
 	}
 
@@ -350,7 +369,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			|| ehdr.e_version != 1
 			|| ehdr.e_phentsize != sizeof (struct Phdr)
 			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
+		printf ("load: %s: error loading executable\n", token_1);
 		goto done;
 	}
 
@@ -416,6 +435,57 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	/* customed 0521 */
+	char *token;
+	char *argv[100];
+	int argc = 0;
+
+	argv[argc] = token_1;
+	argc++;
+
+	// Parsing
+	for (token = strtok_r(NULL, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argv[argc] = token;
+		argc++;
+	}
+
+	// Arguments pushing
+	char *args_address[100];
+	for (int i = argc - 1; i >= 0; i--)
+	{
+		int len = strlen(argv[i]) + 1; // +1의 이유는 '\0'
+
+		if_->rsp -= len;
+		memcpy(if_->rsp, argv[i], len);
+		args_address[i] = if_->rsp;
+	}
+
+	// Padding
+	while (if_->rsp % 8 != 0)
+	{
+		if_->rsp -= 1;
+		memset(if_->rsp, 0, 1);
+	}
+
+	// argv[4] pushing (0)
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, 8);
+
+	// Arguments address pushing
+	for (int i = argc - 1; i >= 0; i--)
+	{
+		if_->rsp -= 8;
+		memcpy(if_->rsp, &args_address[i], 8);
+	}
+
+	// return address pushing (0)
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, 8);
+
+	// pushing argc, argv to rdi, rsi
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp + 8;
 
 	success = true;
 
