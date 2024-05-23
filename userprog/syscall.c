@@ -11,7 +11,9 @@
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
-#include "devices/input.h"
+#include "threads/init.h"
+#include "include/threads/vaddr.h"
+
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -49,31 +51,49 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t syscall_number = f->R.rax;
 	switch (syscall_number)
 	{
-		case SYS_WRITE :
+		case SYS_HALT :
 		{
-			int fd = f->R.rdi;
-			const void *buffer = f->R.rsi;
-			unsigned size = f->R.rdx;
-
-			address_checker(buffer);
-
-			if (fd == 1)
-			{
-				putbuf(buffer, size);
-				f->R.rax = size;
-			}
-			else
-			{
-				f->R.rax = -1;
-			}
+			power_off();
 			break;
 		}
 
 		case SYS_EXIT :
 		{
 			int status = f->R.rdi;
-			thread_current()->exit_code = status;
+			struct thread *curr = thread_current();
+			curr->exit_code = status;
+			printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 			thread_exit();
+			f->R.rax = f->R.rdi;
+			break;
+		}
+
+		case SYS_FORK :
+		{}
+
+		case SYS_EXEC :
+		{
+			const char *cmd_line = f->R.rdi;
+
+		}
+
+		case SYS_WAIT :
+		{}
+
+		case SYS_CREATE :
+		{
+			const char *file = f->R.rdi;
+			unsigned initial_size = f->R.rsi;
+			address_checker((void *)file);
+			f->R.rax = filesys_create(file, initial_size);
+			break;
+		}
+
+		case SYS_REMOVE : 
+		{
+			const char *file = f->R.rdi;
+			address_checker((void *)file);
+			f->R.rax = filesys_remove(file);
 			break;
 		}
 
@@ -87,8 +107,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				f->R.rax = -1;
 			}
 		}
-		
-		case SYS_READ :
+
+		case SYS_FILESIZE :
+		{}
+
+		case SYS_READ : //file
 		{
 			int str_cnt = 0;
 			
@@ -117,33 +140,45 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		}
 
-		case SYS_CREATE :
+		case SYS_WRITE : //file
 		{
-			const char *file = f->R.rdi;
-			unsigned initial_size = f->R.rsi;
-			address_checker((void *)file);
-			f->R.rax = filesys_create(file, initial_size);
+			int fd = f->R.rdi;
+			const void *buffer = f->R.rsi;
+			unsigned size = f->R.rdx;
+
+			address_checker(buffer);
+
+			if (fd == 1)
+			{
+				putbuf(buffer, size);
+				f->R.rax = size;
+			}
+			else
+			{
+				f->R.rax = -1;
+			}
 			break;
 		}
 
-		case SYS_REMOVE :
-		{
-			const char *file = f->R.rdi;
-			address_checker((void *)file);
-			f->R.rax = filesys_remove(file);
-			break;
-		}
+		case SYS_SEEK :
+		{}
 
+		case SYS_TELL :
+		{}
+		case SYS_CLOSE :
+		{}
+		
 		default :
 			printf ("system call!\n");
-			thread_exit ();
+			thread_exit();
 	}
 }
 
 /* customed 0523 */
 void address_checker(void *address){
-	if (address == NULL || pml4_get_page(thread_current()->pml4, address) == NULL)
+	if (address == NULL || is_kernel_vaddr(address) || pml4_get_page(thread_current()->pml4, address) == NULL)
 	{
 		thread_exit();
 	}
 }
+
