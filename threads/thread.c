@@ -842,3 +842,15 @@ void recent_cpu_add_1(void)
         curr->recent_cpu = fp_add2(curr->recent_cpu, 1);
     }
 }
+
+struct thread*
+get_thread(tid_t tid)
+{
+	struct list_elem *e;
+	for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
+	{
+		struct thread *t = list_entry(e, struct thread, a_elem);
+		if (t->tid == tid)
+			return t;
+	}
+}

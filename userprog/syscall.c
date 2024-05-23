@@ -7,6 +7,11 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+/* customed 0523 */
+#include "filesys/directory.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "devices/input.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -40,7 +45,105 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	printf ("system call!\n");
-	thread_exit ();
+	/* customed 0523 */
+	uint64_t syscall_number = f->R.rax;
+	switch (syscall_number)
+	{
+		case SYS_WRITE :
+		{
+			int fd = f->R.rdi;
+			const void *buffer = f->R.rsi;
+			unsigned size = f->R.rdx;
+
+			address_checker(buffer);
+
+			if (fd == 1)
+			{
+				putbuf(buffer, size);
+				f->R.rax = size;
+			}
+			else
+			{
+				f->R.rax = -1;
+			}
+			break;
+		}
+
+		case SYS_EXIT :
+		{
+			int status = f->R.rdi;
+			thread_current()->exit_code = status;
+			thread_exit();
+			break;
+		}
+
+		case SYS_OPEN :
+		{
+			const char *file = f->R.rdi;
+			address_checker(file);
+			struct file *open_file = filesys_open(file);
+			if (open_file == NULL)
+			{
+				f->R.rax = -1;
+			}
+		}
+		
+		case SYS_READ :
+		{
+			int str_cnt = 0;
+			
+			int fd = f->R.rdi;
+			const void *buffer = f->R.rsi;
+			unsigned size = f->R.rdx;
+			address_checker(buffer);
+
+			if (fd == 0)
+			{
+				char c;
+				while (c = input_getc())
+				{
+					if (c == '\n')
+						break;
+					*(char*)buffer = c;
+					buffer++;
+					++str_cnt;
+				}
+				f->R.rax = str_cnt;
+			}
+			else
+			{
+				f->R.rax = -1;
+			}
+			break;
+		}
+
+		case SYS_CREATE :
+		{
+			const char *file = f->R.rdi;
+			unsigned initial_size = f->R.rsi;
+			address_checker((void *)file);
+			f->R.rax = filesys_create(file, initial_size);
+			break;
+		}
+
+		case SYS_REMOVE :
+		{
+			const char *file = f->R.rdi;
+			address_checker((void *)file);
+			f->R.rax = filesys_remove(file);
+			break;
+		}
+
+		default :
+			printf ("system call!\n");
+			thread_exit ();
+	}
+}
+
+/* customed 0523 */
+void address_checker(void *address){
+	if (address == NULL || pml4_get_page(thread_current()->pml4, address) == NULL)
+	{
+		thread_exit();
+	}
 }

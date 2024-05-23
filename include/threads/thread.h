@@ -111,6 +111,7 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	int exit_code;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -168,6 +169,7 @@ void calculate_priority(struct thread *t);
 void recalculate_recent_cpu(void);
 void recalculate_priority(void);
 void recent_cpu_add_1(void);
+struct thread* get_thread(tid_t tid);
 
 bool
 d_list_higher_priority (const struct list_elem *a_, const struct list_elem *b_,

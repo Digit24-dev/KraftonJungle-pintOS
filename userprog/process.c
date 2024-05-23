@@ -189,7 +189,7 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -210,12 +210,14 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	/* customed 0521 */
-	while (1)
+	/* customed 0523 */
+	struct thread* p = get_thread(child_tid);
+
+	while (child_tid)
 	{
-		if (child_tid == NULL)
+		if (p->status == THREAD_DYING)
 		{
-			return -1;
+			return p->exit_code;
 		}
 	}
 }
@@ -224,6 +226,7 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
+	printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
