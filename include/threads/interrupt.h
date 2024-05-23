@@ -16,7 +16,7 @@ enum intr_level intr_enable (void);
 enum intr_level intr_disable (void);
 
 /* Interrupt stack frame. */
-struct gp_registers {	// 40 bytes
+struct gp_registers {	// 8 * 15 bytes
 	uint64_t r15;
 	uint64_t r14;
 	uint64_t r13;
@@ -34,10 +34,10 @@ struct gp_registers {	// 40 bytes
 	uint64_t rax;
 } __attribute__((packed));
 
-struct intr_frame {			// 72 bytes
+struct intr_frame {			// - bytes
 	/* Pushed by intr_entry in intr-stubs.S.
 	   These are the interrupted task's saved registers. */
-	struct gp_registers R;	// 40 bytes
+	struct gp_registers R;	// 8 * 15 bytes
 	uint16_t es;
 	uint16_t __pad1;
 	uint32_t __pad2;

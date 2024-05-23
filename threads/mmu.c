@@ -8,6 +8,13 @@
 #include "threads/mmu.h"
 #include "intrinsic.h"
 
+/*
+- 이 함수는 주어진 가상 주소에 대한 PTE를 찾거나 생성한다.
+- 인자 pdp, va, create
+- pdp가 null이 아니면, va의 pdx를 사용하여 해당 엔트리를 찾는다.
+- 엔트리가 존재하지 않고 create가 true인 경우, 새로운 페이지를 할당하고 엔트리를 초기화.
+- 엔트리가 존재하면, PT의 주소를 계산하여 반환.
+*/
 static uint64_t *
 pgdir_walk (uint64_t *pdp, const uint64_t va, int create) {
 	int idx = PDX (va);
@@ -28,6 +35,14 @@ pgdir_walk (uint64_t *pdp, const uint64_t va, int create) {
 	return NULL;
 }
 
+/*
+- 가상 주소에 대한 페이지 디렉터리 포인터 엔트리를 찾거나 생성
+- 인자 pdpe, va, create
+- 엔트리가 존재하지 않고 create가 true일 경우, 새로운 페이지를 할당하고 엔트리를 초기화.
+- 엔트리가 존재하면, pgdir_wlak 함수를 호출하여 페이지 테이블 엔트리를 찾거나 생성.
+- 페이지 테이블 엔트리를 찾지 못하고 새로운 페이지를 할당했던 경우, 할당된 페이지를 해제.
+- 페이지 테이블 엔트리 반환.
+*/
 static uint64_t *
 pdpe_walk (uint64_t *pdpe, const uint64_t va, int create) {
 	uint64_t *pte = NULL;

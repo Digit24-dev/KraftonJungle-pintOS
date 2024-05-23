@@ -208,7 +208,7 @@ thread_create (const char *name, int priority,
 	ASSERT (function != NULL);
 
 	/* Allocate thread. */
-	t = palloc_get_page (PAL_ZERO);
+	t = palloc_get_page (PAL_ZERO);						// (4KB) single page
 	if (t == NULL)
 		return TID_ERROR;
 
@@ -226,7 +226,7 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-
+	
 	/* advanced */
 	list_push_back(&all_thread_list, &t->adv_elem);
 
@@ -789,3 +789,16 @@ void recent_cpu_add_1(void)
     }
 }
 /* advanced */
+
+/* project2-2 */
+struct thread*
+get_thread(tid_t tid)
+{
+	struct list_elem *e;
+	for (e = list_begin(&all_thread_list); e != list_end(&all_thread_list); e = list_next(e))
+	{
+		struct thread *t = list_entry(e, struct thread, adv_elem);
+		if (t->tid == tid)
+			return t;
+	}
+}

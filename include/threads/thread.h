@@ -106,6 +106,12 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
+	/* Project2 - process hierarchy */
+	struct thread *parent_process;		/* Parent process */
+	struct list child_list;				/* List of children */
+	struct list_elem child_elem;		/* Children elem */
+	int exit_code;						/* Exit code */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -165,4 +171,5 @@ void preemption();
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+struct thread* get_thread(tid_t tid);
 #endif /* threads/thread.h */

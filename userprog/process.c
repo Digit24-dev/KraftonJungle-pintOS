@@ -22,6 +22,8 @@
 #include "vm/vm.h"
 #endif
 
+#define MAX_ARGS 25
+
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -40,7 +42,7 @@ process_init (void) {
  * Notice that THIS SHOULD BE CALLED ONCE. */
 tid_t
 process_create_initd (const char *file_name) {
-	char *fn_copy;
+	char *fn_copy, *save_ptr;
 	tid_t tid;
 
 	/* Make a copy of FILE_NAME.
@@ -49,6 +51,8 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
+
+	strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
@@ -204,6 +208,16 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	struct thread* p = get_thread(child_tid);
+
+	while (child_tid)
+	{
+		if (p->status == THREAD_DYING)
+		{
+			return p->exit_code;
+		}
+	}
+	
 	return -1;
 }
 
@@ -215,7 +229,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	// printf("%s: exit(%d)\n", curr->name, curr->exit_code);
 	process_cleanup ();
 }
 
@@ -329,6 +343,13 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	/* parsing file_name */
+	char *save_ptr;
+	char *argv = palloc_get_page(0);
+	strlcpy(argv, file_name, PGSIZE);
+	
+	strtok_r(file_name, " ", &save_ptr);
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -417,7 +438,58 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
+	// <--- argument passing ---> //
+	int argc = 0;
+	int padded = 0;
+	char *token;
+	char *args[MAX_ARGS];
+	uintptr_t args_p[MAX_ARGS];
+	uintptr_t argv_p;
+
+	for (token = strtok_r(argv, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
+		args[argc] = token;
+		++argc;
+	}
+
+	// arguments
+	for (i = argc - 1; i >= 0; i--)
+	{
+		if_->rsp -= strlen(args[i]) + 1;
+		args_p[i] = if_->rsp;
+		memcpy(if_->rsp, args[i], strlen(args[i]) + 1);
+	}
+
+	// padding
+	padded = (USER_STACK - if_->rsp) % (sizeof(uintptr_t));
+	if (padded != 0) {
+		if_->rsp -= sizeof(uintptr_t) - padded;
+		memset(if_->rsp, 0, sizeof(uintptr_t) - padded);
+	}
+
+	// argument's address
+	if_->rsp -= sizeof(uintptr_t);
+	memset(if_->rsp, 0, sizeof(char*));
+	for (i = argc - 1; i >= 0; i--)
+	{
+		if_->rsp -= sizeof(char*);
+		unsigned char **p = (void*)if_->rsp;
+		*p = args_p[i];
+	}
+
+	// argc & argv
+	if_->R.rsi = if_->rsp;
+	if_->R.rdi = argc;
+
+	// return
+	if_->rsp -= sizeof(void*);
+	memset(if_->rsp, 0, sizeof(void*));
+
+	// <--- argument passing ---> //
+
+	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+
 	success = true;
+	palloc_free_page(argv);
 
 done:
 	/* We arrive here whether the load is successful or not. */

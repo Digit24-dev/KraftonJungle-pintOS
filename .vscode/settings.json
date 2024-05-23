@@ -11,6 +11,17 @@
         "flags.h": "c",
         "interrupt.h": "c",
         "stdbool.h": "c",
-        "vm.h": "c"
+        "vm.h": "c",
+        "*.inc": "c",
+        "stdio.h": "c",
+        "gdt.h": "c",
+        "filesys.h": "c",
+        "loader.h": "c",
+        "syscall-nr.h": "c",
+        "syscall.h": "c",
+        "stddef.h": "c",
+        "exception.h": "c",
+        "file.h": "c",
+        "malloc.h": "c"
     }
 }
