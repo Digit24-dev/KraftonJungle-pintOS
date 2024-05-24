@@ -325,6 +325,8 @@ thread_exit (void) {
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
 	list_remove(&thread_current()->adv_elem);
+	if (thread_current()->parent_process != NULL)
+		list_remove(&thread_current()->child_elem);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -458,15 +460,32 @@ init_thread (struct thread *t, const char *name, int priority) {
 	ASSERT (name != NULL);
 
 	memset (t, 0, sizeof *t);
+
 	t->status = THREAD_BLOCKED;
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
+
 	t->priority = priority;
+
 	/* customed */
 	t->original_priority = priority;
 	t->time_to_wakeup = 0;
 	list_init(&t->donations);
+
+	/* process init */
+	t->parent_process = NULL;
+	list_init(&t->child_list);
+
+	/* locks */
+	sema_init(&t->sema_exit, 0);
+	sema_init(&t->sema_load, 0);
 	t->wait_on_lock = NULL;
+	
+	/* fdt init */
+	t->nex_fd = 2;
+	for (size_t i = 2; i < MAX_FDT; i++)
+		t->fdt[i] = NULL;
+
 	/* advanced */
 	t->nice = 0;
 	t->recent_cpu = 0;

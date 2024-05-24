@@ -9,6 +9,10 @@
 #include "intrinsic.h"
 #include "lib/stdio.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
+
+#include "userprog/process.h"
+#include "string.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -26,17 +30,10 @@ void syscall_handler (struct intr_frame *);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-#define MAX_FD	255
-static struct file *inner_fd[MAX_FD];
-
-void
-fd_init(void) {
-	inner_fd[STDIN_FILENO] = NULL;
-	inner_fd[STDOUT_FILENO] = NULL;
-}
-
 void
 syscall_init (void) {
+	lock_init(&filesys_lock);
+
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -46,6 +43,15 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+}
+
+bool
+address_check (void *pointer) {
+	// printf("NULL: %p \n", (void *)NULL);
+	// printf("pointer: %p \n", pml4_get_page(thread_current()->pml4, pointer));
+	void *pp = pml4_get_page(thread_current()->pml4, pointer);
+	if (pointer == NULL || is_kernel_vaddr(pointer) || pp == NULL)
+		exit(-1);
 }
 
 /* The main system call interface */
@@ -59,6 +65,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
+	// printf("syscall: %d\n", f->R.rax);
+	// printf("arg1: %ld\n", arg1);
+	// printf("arg2: %ld\n", arg2);
+	// printf("arg3: %ld\n", arg3);
+	// printf("arg4: %ld\n", arg4);
+	// printf("arg5: %ld\n", arg5);
+	// printf("arg6: %ld\n", arg6);
 
 	// check validity
 	switch (f->R.rax)
@@ -66,49 +79,70 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_HALT:
 			halt();
 			break;
+
 		case SYS_EXIT:
-			exit((int)f->R.rdi);
 			f->R.rax = f->R.rdi;
+			exit((int)f->R.rdi);
 			break;
-	// 	case SYS_FORK:
-	// 		fork();
-	// 		break;
+
+		case SYS_FORK:
+			address_check(arg1);
+			f->R.rax = fork(arg1);
+			break;
+
 	// 	case SYS_EXEC:
 	// 		exec();
 	// 		break;
-	// 	case SYS_WAIT:
-	// 		wait();
-	// 		break;
+
+		case SYS_WAIT:
+			f->R.rax = wait((int)arg1);
+			break;
+
 		case SYS_CREATE:
-			create((const char*)arg1, (unsigned int)arg2);
+			address_check(arg1);
+			if (arg1 == "") exit(-1);
+			f->R.rax = create((const char*)arg1, (unsigned int)arg2);
 			break;
+
 		case SYS_REMOVE:
-			remove((const char*)arg1);
+			address_check(arg1);
+			f->R.rax = remove((const char*)arg1);
 			break;
+
 		case SYS_OPEN:
-			open((const char*)arg1);
+			address_check(arg1);
+			if (arg1 == "") exit(-1);
+			f->R.rax = open((const char*)arg1);
 			break;
-	// 	case SYS_FILESIZE:
-	// 		filesize();
-	// 		break;
+
+		case SYS_FILESIZE:
+			f->R.rax = filesize((int)arg1);
+			break;
+
 		case SYS_READ:
-			printf("Read() called. \n");
+			address_check(arg2);
 			f->R.rax = read((int)arg1, (void*)arg2, (unsigned int)arg3);
 			break;
+
 		case SYS_WRITE:
+			address_check((void*)arg2);
 			f->R.rax = write((int)arg1, (const void*)arg2, (unsigned int)arg3);
 			break;
-	// 	case SYS_SEEK:
-	// 		seek();
-	// 		break;
-	// 	case SYS_TELL:
-	// 		tell();
-	// 		break;
-	// 	case SYS_CLOSE:
-	// 		close();
-	// 		break;
+
+		case SYS_SEEK:
+			seek((int)arg1, (unsigned int)arg2);
+			break;
+
+		case SYS_TELL:
+			f->R.rax = tell((int)arg1);
+			break;
+
+		case SYS_CLOSE:
+			close((int)arg1);
+			break;
+
 		default:
-			thread_exit();
+			exit(-1);
 			break;
 	}
 }
@@ -121,8 +155,8 @@ void halt (void)
 void exit (int status)
 {
 	struct thread *curr = thread_current();
-	printf("%s: exit(%d)\n", curr->name, curr->exit_code);
 	thread_current()->exit_code = status;
+	printf("%s: exit(%d)\n", curr->name, curr->exit_code);
 	thread_exit();
 }
 
@@ -130,6 +164,10 @@ int write (int fd, const void *buffer, unsigned length)
 {
 	int str_cnt = 0;
 	const char *p = buffer;
+	struct file *param = NULL;
+
+	if (fd >= MAX_FDT || fd < 0) return -1;
+
 	switch (fd)
 	{
 	case STDIN_FILENO:
@@ -143,8 +181,10 @@ int write (int fd, const void *buffer, unsigned length)
 		}
 		putbuf(buffer, str_cnt);
 		break;
-
 	default:
+		param = fd_to_file(fd);
+		if (param == NULL) return -1;
+		str_cnt = file_write(param, buffer, length);
 		break;
 	}
 	return str_cnt;
@@ -154,10 +194,14 @@ int read (int fd, void *buffer, unsigned length)
 {
 	int str_cnt = 0;
 	const char *p = buffer;
+	struct file *fp = NULL;
 	char c;
+
+	if (fd >= MAX_FDT || fd < 0) return -1;
+
 	switch (fd)
 	{
-	case 0:
+	case STDIN_FILENO:
 		while (c = input_getc())
 		{
 			if (c == '\n') // || c == '\0')
@@ -167,12 +211,14 @@ int read (int fd, void *buffer, unsigned length)
 			++str_cnt;
 		}
 		break;
-	case 1:
+	case STDOUT_FILENO:
 		/* need to set errno to EBADF */
 		str_cnt = -1;
 		break;
-
 	default:
+		fp = fd_to_file(fd);
+		if (fp == NULL) exit(-1);
+		str_cnt = file_read(fp, buffer, length);
 		break;
 	}
 	return str_cnt;
@@ -190,10 +236,60 @@ bool remove (const char *file)
 
 int open (const char *file)
 {
-	filesys_open(file);
+	struct file* param = filesys_open(file);
+	if (param == NULL) return -1;
+	return thread_add_file(param);
 }
 
 int filesize (int fd)
 {
+	struct file *param = fd_to_file(fd);
+	return file_length(param);
+}
 
+void seek (int fd, unsigned position)
+{
+	struct file* param = fd_to_file(fd);
+	file_seek(param, position);
+}
+
+unsigned tell (int fd)
+{
+	struct file *param = fd_to_file(fd);
+	return file_tell(param);
+}
+
+void close (int fd)
+{
+	if (fd < 0 || fd >= MAX_FDT) exit(-1);
+	struct file *param = fd_to_file(fd);
+	if (param == NULL) exit(-1);
+	thread_current()->fdt[fd] = NULL;
+	file_close(param);
+}
+
+/* fd -> struct file* */
+struct file*
+fd_to_file (int fd) {
+	return thread_current()->fdt[fd];
+}
+
+int 
+thread_add_file (struct file *f)
+{
+	struct thread *cur = thread_current();
+	int ret = cur->nex_fd;
+	cur->fdt[cur->nex_fd] = f;
+	++cur->nex_fd;
+	return ret;
+}
+
+pid_t fork (const char *thread_name)
+{
+	return process_fork(thread_name, &thread_current()->tf);
+}
+
+int wait (pid_t pid)
+{
+	return process_wait(pid);
 }

@@ -6,10 +6,13 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/fp-ops.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
+// #define USERPROG
+#define MAX_FDT	64
 #define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -111,6 +114,12 @@ struct thread {
 	struct list child_list;				/* List of children */
 	struct list_elem child_elem;		/* Children elem */
 	int exit_code;						/* Exit code */
+
+	/* Project2 - File Descriptor */
+	int nex_fd;
+	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct semaphore sema_exit;			/* semaphore for wait */
+	struct semaphore sema_load;			/* semaphore for load */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

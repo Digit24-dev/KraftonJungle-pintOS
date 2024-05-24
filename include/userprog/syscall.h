@@ -1,17 +1,23 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
-// #include "include/lib/user/syscall.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
+
+typedef int pid_t;
+
+/* Project2 - File Descriptor */
+
+struct file* fd_to_file (int fd);
+int file_to_fd (struct file* file);
+int thread_add_file (struct file *f);
 
 void syscall_init (void);
-static bool put_user (uint8_t *udst, uint8_t byte);
-static int64_t get_user (const uint8_t *uaddr);
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
-// pid_t fork (const char *thread_name);
+pid_t fork (const char *thread_name);
 int exec (const char *file);
-int wait (pid_t);
+int wait (pid_t pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);

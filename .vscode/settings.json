@@ -22,6 +22,9 @@
         "stddef.h": "c",
         "exception.h": "c",
         "file.h": "c",
-        "malloc.h": "c"
+        "malloc.h": "c",
+        "debug.h": "c",
+        "mmu.h": "c",
+        "pte.h": "c"
     }
 }

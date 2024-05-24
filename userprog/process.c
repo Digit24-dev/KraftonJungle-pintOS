@@ -94,23 +94,32 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	void *parent_page;
 	void *newpage;
 	bool writable;
-
+	
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va))
+		return true;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
+	if (newpage == NULL)
+		return false;
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -126,7 +135,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -152,6 +161,20 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	lock_acquire(&filesys_lock);
+	for (size_t i = 2; i < MAX_FDT; i++) {
+		if (parent->fdt[i] != NULL)
+			current->fdt[i] = file_duplicate(parent->fdt[i]);
+		else
+			current->fdt[i] = NULL;
+	}
+	lock_release(&filesys_lock);
+	/* copy file descriptor table */
+	enum intr_level old_level = intr_disable();
+	list_push_back(&parent->child_list, &current->child_elem);
+	intr_set_level(old_level);
+
+	current->parent_process = parent;
 
 	process_init ();
 
@@ -193,6 +216,17 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
+struct thread*
+get_child_process(int tid) {
+	struct list *cl = &thread_current()->child_list;
+	struct list_elem *e;
+	for (e = list_begin(cl); e != list_end(cl); e = list_next(e))
+	{
+		struct thread *cthread = list_entry(e, struct thread, child_elem);
+		if (cthread->tid == tid)
+			return cthread;
+	}
+}
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
@@ -208,16 +242,18 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	struct thread* p = get_thread(child_tid);
-
+	// struct thread* child_thread = get_child_process(child_tid);
+	// if (child_thread->status == THREAD_DYING)
+	// 	return -1;
+	// sema_down(&child_thread->sema_exit);
+	struct thread* child_thread = get_thread(child_tid);
 	while (child_tid)
 	{
-		if (p->status == THREAD_DYING)
+		if (child_thread->status == THREAD_DYING)
 		{
-			return p->exit_code;
+			return child_thread->exit_code;
 		}
 	}
-	
 	return -1;
 }
 
@@ -229,7 +265,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	// printf("%s: exit(%d)\n", curr->name, curr->exit_code);
+	sema_up(&curr->sema_exit);
 	process_cleanup ();
 }
 
