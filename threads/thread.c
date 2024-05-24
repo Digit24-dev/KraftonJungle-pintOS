@@ -246,7 +246,6 @@ thread_create (const char *name, int priority,
 	/* ====================== customed for advanced ======================*/
 	list_push_back(&all_list, &t->a_elem);
 
-	/* customed */
 	/* priority scheduler
 		compare the priorities of the currently running thread and the newly inserted one.
 		Yield the CPU if the newly arriving thread has higher priority
@@ -500,6 +499,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* ====================== customed for advanced ======================*/
 	t->recent_cpu = 0;
 	t->nice = 0;
+
+	/* customed 0523 */
+	for (int i = 0; i < FDT_MAX; i++)
+	{
+		t->fdt[i] = NULL;
+	}
+	t->next_fd = 2;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
