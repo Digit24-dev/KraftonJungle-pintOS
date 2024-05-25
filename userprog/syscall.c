@@ -13,6 +13,8 @@
 #include "filesys/filesys.h"
 #include "threads/init.h"
 #include "include/threads/vaddr.h"
+/* customed 0524 */
+#include "include/userprog/process.h"
 
 
 void syscall_entry (void);
@@ -72,8 +74,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		}
 
-		// case SYS_FORK :
-		// {}
+		case SYS_FORK :
+		{
+			address_checker(arg1);
+			f->R.rax = fork((const char*)arg1);
+			break;
+		}
 
 		// case SYS_EXEC :
 		// {
@@ -81,8 +87,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		// }
 
-		// case SYS_WAIT :
-		// {}
+		case SYS_WAIT :
+		{
+			f->R.rax = wait((pid_t)arg1);
+			break;
+		}
 
 		case SYS_CREATE :
 		{
@@ -144,7 +153,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		default :
 			// printf ("system call!\n");
-			thread_exit();
+			exit(-1);
 			break;
 	}
 }
@@ -174,6 +183,8 @@ int write (int fd, const void *buffer, unsigned length)
 {
 	int str_cnt = 0;
 	const char *p = buffer;
+	if (fd >= FDT_MAX || fd < 0) return -1;
+
 	if (fd == 1)
 	{
 		while (*p != '\0' && str_cnt <= length) {
@@ -181,12 +192,22 @@ int write (int fd, const void *buffer, unsigned length)
 			++str_cnt;
 		}
 		putbuf(buffer, str_cnt);
+		return str_cnt;
 	}
 	else if (fd == 0)
 	{
 		str_cnt = -1;
+		return str_cnt;
 	}
-	return str_cnt;
+	else
+	{
+		struct file *open_file = fd_to_file(fd);
+		if (open_file == NULL)
+			exit(-1);
+		
+		str_cnt = file_write(open_file, buffer, length);
+		return str_cnt;
+	}
 }
 
 int read (int fd, void *buffer, unsigned length)
@@ -194,6 +215,9 @@ int read (int fd, void *buffer, unsigned length)
 	int str_cnt = 0;
 	char c;
 	const char *p = buffer;
+
+	if (fd >= FDT_MAX || fd < 0) return -1;
+
 	if (fd == 0)
 	{
 		while (c = input_getc())
@@ -204,22 +228,27 @@ int read (int fd, void *buffer, unsigned length)
 			p++;
 			++str_cnt;
 		}
+		return str_cnt;
 	}
 	else if (fd == 1)
 	{
 		str_cnt = -1;
+		return str_cnt;
 	}
 	else
 	{
-		struct file *fp = fd_to_file(fd);
-		if (fp == NULL) exit(-1);
-		str_cnt = file_read(fp, buffer, length);
+		struct file *open_file = fd_to_file(fd);
+		if (open_file == NULL)
+			exit(-1);
+
+		str_cnt = file_read(open_file, buffer, length);
+		return str_cnt;
 	}
-	return str_cnt;
 }
 
 bool create (const char *file, unsigned initial_size)
 {
+	
 	return filesys_create(file, initial_size);
 }
 
@@ -271,7 +300,7 @@ struct file* fd_to_file(int fd)
 
 int file_to_fd (struct file* file)
 {
-	struct file** p = thread_current()->fdt;
+	struct file **p = thread_current()->fdt;
 	for (size_t i = 2; i < FDT_MAX; i++)
 	{
 		if (*(p + i) == file) {
@@ -289,4 +318,14 @@ thread_add_file (struct file *f)
 	cur->fdt[cur->next_fd++] = f;
 	++cur->next_fd;
 	return ret;
+}
+
+/* process */
+pid_t fork (const char *thread_name){
+	struct intr_frame *if_ = &thread_current()->tf;
+	return process_fork(thread_name, if_);
+}
+
+int wait (pid_t pid) {
+	return process_wait(pid);
 }

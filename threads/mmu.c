@@ -144,11 +144,22 @@ pdp_for_each (uint64_t *pdp,
 }
 
 /* Apply FUNC to each available pte entries including kernel's. */
+// pml4 전체를 순회하면서 각 유효한 PTE에 대해 주어진 func 함수를 호출
 bool
 pml4_for_each (uint64_t *pml4, pte_for_each_func *func, void *aux) {
+	
+	// pml4에 있는 모든 entry 순회)
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++) {
+		
+		// 현재 pml4 entry에 해당하는 PDPE(Page Directory Point Entry) 가져옴
+		// ptov : physical address -> kernel virtual address translate
 		uint64_t *pdpe = ptov((uint64_t *) pml4[i]);
+
+		// PDPE가 유효한지 확인 / PTE_P 비트가 설정되어 있으면 유효하다고 판단
 		if (((uint64_t) pdpe) & PTE_P)
+
+			// pdf_for_each : 현재 PDPE에 매핑된 모든 PD(Page Directory) 순회
+			// 순회하면서 func 함수 호출하는데, return value가 false라면 false return
 			if (!pdp_for_each ((uint64_t *) PTE_ADDR (pdpe), func, aux, i))
 				return false;
 	}
