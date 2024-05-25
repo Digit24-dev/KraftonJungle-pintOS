@@ -240,18 +240,18 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	
-	/* Add to run queue. */
-	thread_unblock (t);
-
 	/* ====================== customed for advanced ======================*/
 	list_push_back(&all_list, &t->a_elem);
+	list_push_back(&thread_current()->child_set, &t->child_elem);
+	
+	/* Add to run queue. */
+	thread_unblock (t);
 
 	/* priority scheduler
 		compare the priorities of the currently running thread and the newly inserted one.
 		Yield the CPU if the newly arriving thread has higher priority
 	*/
-	struct thread *cur_thread = running_thread();
-	if (cur_thread->priority < t->priority) {
+	if (thread_current()->priority < t->priority) {
 		thread_yield();
 	}
 	/* customed */
@@ -340,11 +340,13 @@ thread_exit (void) {
 	   We will be destroyed during the call to schedule_tail(). */
 
 	/* ====================== customed for advanced ======================*/
-	enum intr_level old_level = intr_disable();
-	list_remove(&thread_current()->a_elem);
-	intr_set_level(old_level);
-
 	intr_disable ();
+	list_remove(&thread_current()->a_elem);
+	if (thread_current()->parent != NULL)
+		list_remove(&thread_current()->child_elem);
+	thread_current()->is_dead = true;
+	// palloc_free_page(thread_current());
+	sema_up(&thread_current()->wait_sema);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -494,18 +496,25 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
 	t->original_priority = priority;
-	t->magic = THREAD_MAGIC;
 	
 	/* ====================== customed for advanced ======================*/
 	t->recent_cpu = 0;
 	t->nice = 0;
 
 	/* customed 0523 */
-	for (int i = 0; i < FDT_MAX; i++)
+	for (int i = 2; i < FDT_MAX; i++)
 	{
 		t->fdt[i] = NULL;
 	}
 	t->next_fd = 2;
+
+	t->is_dead = false;
+	t->parent = NULL;
+	list_init(&t->child_set);
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->load_sema, 0);
+
+	t->magic = THREAD_MAGIC;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/fixed_point.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -110,13 +111,22 @@ struct thread {
 	/* customed 0516 */
 	int nice;
 	int recent_cpu;
+	
+	struct file* fdt[FDT_MAX];
+	int next_fd;
+
+	struct thread *parent; // 부모 thread 포인터
+	struct list child_set; // 자식 list
+	struct list_elem child_elem; // 자식 list elem
+	int exit_code; // 종료 status
+	
+	bool is_dead;
+	struct semaphore wait_sema; // wait semaphore
+	struct semaphore load_sema;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-	int exit_code;
-	struct file* fdt[FDT_MAX];
-	int next_fd;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

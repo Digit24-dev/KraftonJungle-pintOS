@@ -321,10 +321,10 @@ thread_add_file (struct file *f)
 }
 
 /* process */
-pid_t fork (const char *thread_name){
-	struct intr_frame *if_ = &thread_current()->tf;
-	return process_fork(thread_name, if_);
-}
+// pid_t fork (const char *thread_name){
+// 	struct intr_frame *if_ = &thread_current()->tf;
+// 	return process_fork(thread_name, if_);
+// }
 
 int wait (pid_t pid) {
 	return process_wait(pid);

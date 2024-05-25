@@ -195,7 +195,19 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-
+struct thread*
+get_child_process(int tid) {
+	struct list *cl = &thread_current()->child_set;
+	struct list_elem *e;
+	struct thread *cthread = NULL;
+	for (e = list_begin(cl); e != list_end(cl); e = list_next(e))
+	{
+		cthread = list_entry(e, struct thread, child_elem);
+		if (cthread->tid == tid)
+			return cthread;
+	}
+	return cthread;
+}
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
  * exception), returns -1.  If TID is invalid or if it was not a
@@ -211,15 +223,19 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	/* customed 0523 */
-	struct thread* p = get_thread(child_tid);
+	struct thread* child = get_child_process(child_tid);
+	if (child == NULL)
+		return -1;
+	
+	if (child->is_dead)
+		return -1;
+	
+	sema_down(&child->wait_sema);
 
-	while (child_tid)
-	{
-		if (p->status == THREAD_DYING)
-		{
-			return p->exit_code;
-		}
-	}
+	if (child->is_dead)
+		return child->exit_code;
+
+	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -344,11 +360,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
-	/* customed 0522 */
+	/* parsing file_name */
 	char *save_ptr;
-	char *token_1;
-
-	token_1 = strtok_r(file_name, " ", &save_ptr);
+	char *argv = palloc_get_page(0);
+	strlcpy(argv, file_name, PGSIZE);
+	
+	strtok_r(file_name, " ", &save_ptr);
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -357,9 +374,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
-	file = filesys_open (token_1);
+	file = filesys_open (file_name);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", token_1);
+		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
 
@@ -371,7 +388,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			|| ehdr.e_version != 1
 			|| ehdr.e_phentsize != sizeof (struct Phdr)
 			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", token_1);
+		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
 
@@ -437,59 +454,59 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	/* customed 0521 */
-	char *token;
-	char *argv[100];
+
+	// <--- argument passing ---> //
 	int argc = 0;
+	int padded = 0;
+	char *token;
+	char *args[64];
+	uintptr_t args_p[64];
+	uintptr_t argv_p;
 
-	argv[argc] = token_1;
-	argc++;
-
-	// Parsing
-	for (token = strtok_r(NULL, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-	{
-		argv[argc] = token;
-		argc++;
+	for (token = strtok_r(argv, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
+		args[argc] = token;
+		++argc;
 	}
 
-	// Arguments pushing
-	char *args_address[100];
-	for (int i = argc - 1; i >= 0; i--)
+	// arguments
+	for (i = argc - 1; i >= 0; i--)
 	{
-		int len = strlen(argv[i]) + 1; // +1의 이유는 '\0'
-
-		if_->rsp -= len;
-		memcpy(if_->rsp, argv[i], len);
-		args_address[i] = if_->rsp;
+		if_->rsp -= strlen(args[i]) + 1;
+		args_p[i] = if_->rsp;
+		memcpy(if_->rsp, args[i], strlen(args[i]) + 1);
 	}
 
-	// Padding
-	while (if_->rsp % 8 != 0)
-	{
-		if_->rsp -= 1;
-		memset(if_->rsp, 0, 1);
+	// padding
+	padded = (USER_STACK - if_->rsp) % (sizeof(uintptr_t));
+	if (padded != 0) {
+		if_->rsp -= sizeof(uintptr_t) - padded;
+		memset(if_->rsp, 0, sizeof(uintptr_t) - padded);
 	}
 
-	// argv[4] pushing (0)
-	if_->rsp -= 8;
-	memset(if_->rsp, 0, 8);
-
-	// Arguments address pushing
-	for (int i = argc - 1; i >= 0; i--)
+	// argument's address
+	if_->rsp -= sizeof(uintptr_t);
+	memset(if_->rsp, 0, sizeof(char*));
+	for (i = argc - 1; i >= 0; i--)
 	{
-		if_->rsp -= 8;
-		memcpy(if_->rsp, &args_address[i], 8);
+		if_->rsp -= sizeof(char*);
+		unsigned char **p = (void*)if_->rsp;
+		*p = args_p[i];
 	}
 
-	// return address pushing (0)
-	if_->rsp -= 8;
-	memset(if_->rsp, 0, 8);
-
-	// pushing argc, argv to rdi, rsi
+	// argc & argv
+	if_->R.rsi = if_->rsp;
 	if_->R.rdi = argc;
-	if_->R.rsi = if_->rsp + 8;
+
+	// return
+	if_->rsp -= sizeof(void*);
+	memset(if_->rsp, 0, sizeof(void*));
+
+	// <--- argument passing ---> //
+
+	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
 
 	success = true;
+	palloc_free_page(argv);
 
 done:
 	/* We arrive here whether the load is successful or not. */
