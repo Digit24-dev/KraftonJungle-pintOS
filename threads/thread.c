@@ -512,7 +512,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->parent = NULL;
 	list_init(&t->child_set);
 	sema_init(&t->wait_sema, 0);
-	sema_init(&t->load_sema, 0);
+	// sema_init(&t->load_sema, 0);
 
 	t->magic = THREAD_MAGIC;
 }
