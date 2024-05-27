@@ -16,6 +16,7 @@
 /* customed 0524 */
 #include "include/userprog/process.h"
 
+struct lock filesys_lock;
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -77,7 +78,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_FORK :
 		{
 			address_checker(arg1);
-			f->R.rax = fork((const char*)arg1);
+			memcpy(&thread_current()->copied_if, f, sizeof(struct intr_frame));
+			f->R.rax = fork(arg1);
 			break;
 		}
 
@@ -175,7 +177,7 @@ void exit (int status)
 {
 	struct thread *curr = thread_current();
 	curr->exit_code = status;
-	printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
+	printf ("%s: exit(%d)\n", curr->name, status);
 	thread_exit();
 }
 
@@ -212,6 +214,7 @@ int write (int fd, const void *buffer, unsigned length)
 
 int read (int fd, void *buffer, unsigned length)
 {
+	address_checker(buffer);
 	int str_cnt = 0;
 	char c;
 	const char *p = buffer;
@@ -240,27 +243,31 @@ int read (int fd, void *buffer, unsigned length)
 		struct file *open_file = fd_to_file(fd);
 		if (open_file == NULL)
 			exit(-1);
-
+		// lock_acquire(&filesys_lock);
 		str_cnt = file_read(open_file, buffer, length);
+		// lock_release(&filesys_lock);
 		return str_cnt;
 	}
 }
 
 bool create (const char *file, unsigned initial_size)
 {
-	
+	address_checker(file);
 	return filesys_create(file, initial_size);
 }
 
 bool remove (const char *file)
 {
+	address_checker(file);
 	return filesys_remove(file);
 }
 
 int open (const char *file)
 {
+	address_checker(file);
 	struct file *open_file = filesys_open(file);
-	if (open_file == NULL) return -1;
+	if (open_file == NULL)
+		return -1;
 	return thread_add_file(open_file);
 }
 
@@ -295,35 +302,49 @@ void close (int fd)
 struct file* fd_to_file(int fd)
 {
     struct thread *t = thread_current();
+    
+    // 파일 디스크립터 유효성 검사
+    if (fd < 0 || fd >= FDT_MAX)
+        return NULL;
+    
+    // 해당 파일 객체가 존재하는지 확인
+    if (t->fdt[fd] == NULL)
+        return NULL;
+    
     return t->fdt[fd];
 }
 
 int file_to_fd (struct file* file)
 {
-	struct file **p = thread_current()->fdt;
-	for (size_t i = 2; i < FDT_MAX; i++)
-	{
-		if (*(p + i) == file) {
-			return i;
-		}
-	}
-	return -1;	// Error
+    struct file **p = thread_current()->fdt;
+    for (size_t i = 2; i < FDT_MAX; i++)
+    {
+        if (*(p + i) == file) {
+            return i;
+        }
+    }
+    return -1;    // Error
 }
 
-int 
-thread_add_file (struct file *f)
+int thread_add_file (struct file *f)
 {
-	struct thread *cur = thread_current();
-	int ret = cur->next_fd;
-	cur->fdt[cur->next_fd++] = f;
-	++cur->next_fd;
-	return ret;
+    struct thread *cur = thread_current();
+    
+    // 파일 디스크립터 테이블이 가득 찼는지 확인
+    if (cur->next_fd >= FDT_MAX)
+        return -1;
+    
+    int ret = cur->next_fd;
+    cur->fdt[cur->next_fd] = f;
+    cur->next_fd++;
+    return ret;
 }
 
 /* process */
 pid_t fork (const char *thread_name){
-	struct intr_frame *if_ = &thread_current()->tf;
-	return process_fork(thread_name, if_);
+	address_checker(thread_name);
+	// struct intr_frame *if_ = &thread_current()->tf;
+	return process_fork(thread_name, NULL);
 }
 
 int wait (pid_t pid) {

@@ -81,17 +81,11 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
-	// struct thread *curr = thread_current();
-	// curr->tf.R.rbx = if_->R.rbx;
-    // curr->tf.R.rbp = if_->R.rbp;
-    // curr->tf.R.r12 = if_->R.r12;
-    // curr->tf.R.r13 = if_->R.r13;
-    // curr->tf.R.r14 = if_->R.r14;
-    // curr->tf.R.r15 = if_->R.r15;
-	// curr->tf.rsp = if_->rsp;
+	struct thread *curr = thread_current();
+	// memcpy(&curr->copied_if, if_, sizeof(struct intr_frame));
 
 	/* Clone current thread to new thread.*/
-	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
 	
 	if (tid == TID_ERROR)
 		return TID_ERROR;
@@ -174,7 +168,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->tf;
+	struct intr_frame *parent_if = &parent->copied_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -330,8 +324,8 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	curr->is_dead = true;
-	sema_up(&curr->wait_sema);
+	// curr->is_dead = true;
+	// sema_up(&curr->wait_sema);
 	// sema_down(&curr->free_sema);
 	process_cleanup ();
 }
@@ -530,7 +524,7 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-
+	// file_deny_write(file);
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
