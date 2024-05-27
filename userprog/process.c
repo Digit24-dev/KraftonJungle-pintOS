@@ -28,6 +28,7 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+struct thread* get_child_process(int tid);
 
 /* General process initializer for initd and other process. */
 static void
@@ -79,9 +80,27 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+	tid_t ret;
+	struct thread *cur = thread_current();
+	memcpy(&cur->copied_if, if_, sizeof(struct intr_frame));
+
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	ret = thread_create (name,
+			PRI_DEFAULT, __do_fork, cur);
+	
+	if (ret == TID_ERROR)
+		return TID_ERROR;
+
+	struct thread *ct = get_child_process(ret);
+
+	if (ct->tid == TID_ERROR)
+	{
+		list_remove(&ct->child_elem);
+		return TID_ERROR;
+	}
+
+	sema_down(&ct->sema_load);
+	return ret;
 }
 
 #ifndef VM
@@ -135,7 +154,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->tf;
+	struct intr_frame *parent_if = &parent->copied_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -161,27 +180,26 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-	lock_acquire(&filesys_lock);
 	for (size_t i = 2; i < MAX_FDT; i++) {
-		if (parent->fdt[i] != NULL)
+		lock_acquire(&filesys_lock);	/* ?? -> 필요한가? 아니면 스레드의 경우만 복사하면 되지 않나..? */
+		if (parent->fdt[i] != NULL) 
 			current->fdt[i] = file_duplicate(parent->fdt[i]);
 		else
 			current->fdt[i] = NULL;
+		lock_release(&filesys_lock);
 	}
-	lock_release(&filesys_lock);
 	/* copy file descriptor table */
-	enum intr_level old_level = intr_disable();
-	list_push_back(&parent->child_list, &current->child_elem);
-	intr_set_level(old_level);
-
-	current->parent_process = parent;
 
 	process_init ();
+	if_.R.rax = 0;
+	sema_up(&current->sema_load);
 
 	/* Finally, switch to the newly created process. */
-	if (succ)
+	if (succ) {
 		do_iret (&if_);
+	}
 error:
+	sema_up(&current->sema_load);
 	thread_exit ();
 }
 
@@ -205,6 +223,8 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	
+	/* **** where should sema_down ? */
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -220,12 +240,14 @@ struct thread*
 get_child_process(int tid) {
 	struct list *cl = &thread_current()->child_list;
 	struct list_elem *e;
+	struct thread *cthread = NULL;
 	for (e = list_begin(cl); e != list_end(cl); e = list_next(e))
 	{
-		struct thread *cthread = list_entry(e, struct thread, child_elem);
+		cthread = list_entry(e, struct thread, child_elem);
 		if (cthread->tid == tid)
 			return cthread;
 	}
+	return cthread;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -242,18 +264,21 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	// struct thread* child_thread = get_child_process(child_tid);
-	// if (child_thread->status == THREAD_DYING)
-	// 	return -1;
-	// sema_down(&child_thread->sema_exit);
-	struct thread* child_thread = get_thread(child_tid);
-	while (child_tid)
-	{
-		if (child_thread->status == THREAD_DYING)
-		{
-			return child_thread->exit_code;
-		}
-	}
+
+	struct thread* child_thread = get_child_process(child_tid);
+
+	if (child_thread == NULL)
+		return -1;
+
+	if (child_thread->terminated)
+		return child_thread->exit_code;
+
+	sema_down(&child_thread->sema_exit);
+	
+	list_remove(&child_thread->child_elem);
+	if (child_thread->terminated)
+		return child_thread->exit_code;
+
 	return -1;
 }
 
@@ -265,7 +290,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	sema_up(&curr->sema_exit);
+	
 	process_cleanup ();
 }
 
@@ -392,9 +417,13 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+	/* Get a lock */
+	lock_acquire(&filesys_lock);
+
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
+		lock_release(&filesys_lock);
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
@@ -464,6 +493,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
+	/* release a lock */
+	file_deny_write(file);
+	lock_release(&filesys_lock);
+
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -530,6 +563,7 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);
+	// sema_up(&t->sema_load);
 	return success;
 }
 

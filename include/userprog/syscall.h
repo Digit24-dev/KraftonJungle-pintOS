@@ -15,7 +15,7 @@ int thread_add_file (struct file *f);
 void syscall_init (void);
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
-pid_t fork (const char *thread_name);
+pid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (const char *file);
 int wait (pid_t pid);
 bool create (const char *file, unsigned initial_size);

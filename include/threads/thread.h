@@ -118,6 +118,10 @@ struct thread {
 	/* Project2 - File Descriptor */
 	int nex_fd;
 	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+
+	/* Project2 - process */
+	struct intr_frame copied_if;		/* copied intr frame */
+	bool terminated;					/* boolean thread */
 	struct semaphore sema_exit;			/* semaphore for wait */
 	struct semaphore sema_load;			/* semaphore for load */
 

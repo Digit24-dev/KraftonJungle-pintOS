@@ -230,17 +230,20 @@ thread_create (const char *name, int priority,
 	/* advanced */
 	list_push_back(&all_thread_list, &t->adv_elem);
 
+	/* Project2 */
+	list_push_back(&thread_current()->child_list, &t->child_elem);
+	t->parent_process = thread_current();
+
+	// sema_up(&t->sema_load);
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
 	/* customed */
-	/* priority scheduler
-		compare the priorities of the currently running thread and the newly inserted one.
-		Yield the CPU if the newly arriving thread has higher priority
-	*/
 	if (thread_current()->priority < t->priority)
 		thread_yield();
 
+// printf("%s created %s. (%d) \n", thread_current()->name, t->name, tid);
 	return tid;
 }
 
@@ -325,8 +328,10 @@ thread_exit (void) {
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
 	list_remove(&thread_current()->adv_elem);
-	if (thread_current()->parent_process != NULL)
-		list_remove(&thread_current()->child_elem);
+	// if (thread_current()->parent_process != NULL)
+	// 	list_remove(&thread_current()->child_elem);
+	thread_current()->terminated = true;
+	sema_up(&thread_current()->sema_exit);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -473,6 +478,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donations);
 
 	/* process init */
+	t->terminated = false;
 	t->parent_process = NULL;
 	list_init(&t->child_list);
 

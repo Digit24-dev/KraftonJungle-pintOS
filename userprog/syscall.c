@@ -87,12 +87,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		case SYS_FORK:
 			address_check(arg1);
-			f->R.rax = fork(arg1);
+			f->R.rax = fork(arg1, f);
 			break;
 
-	// 	case SYS_EXEC:
-	// 		exec();
-	// 		break;
+		case SYS_EXEC:
+			// exec();
+			break;
 
 		case SYS_WAIT:
 			f->R.rax = wait((int)arg1);
@@ -284,9 +284,12 @@ thread_add_file (struct file *f)
 	return ret;
 }
 
-pid_t fork (const char *thread_name)
+pid_t fork (const char *thread_name, struct intr_frame *f)
 {
-	return process_fork(thread_name, &thread_current()->tf);
+	address_check(thread_name);
+	// struct intr_frame bucket;
+	// memcpy(&thread_current()->copied_if, &thread_current()->tf, sizeof(struct intr_frame));
+	return process_fork(thread_name, f);
 }
 
 int wait (pid_t pid)
