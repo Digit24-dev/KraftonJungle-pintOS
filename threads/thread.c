@@ -509,10 +509,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->next_fd = 2;
 
 	t->is_dead = false;
+	t->is_load = false;
 	t->parent = NULL;
+	t->exit_code = 0;
 	list_init(&t->child_set);
 	sema_init(&t->wait_sema, 0);
-	// sema_init(&t->load_sema, 0);
+	sema_init(&t->load_sema, 0);
+	// sema_init(&t->free_sema, 0);
 
 	t->magic = THREAD_MAGIC;
 }

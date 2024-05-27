@@ -121,8 +121,10 @@ struct thread {
 	int exit_code; // 종료 status
 	
 	bool is_dead;
+	bool is_load;
 	struct semaphore wait_sema; // wait semaphore
 	struct semaphore load_sema;
+	// struct semaphore free_sema;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
