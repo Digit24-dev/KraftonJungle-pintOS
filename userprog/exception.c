@@ -151,6 +151,8 @@ page_fault (struct intr_frame *f) {
 	page_fault_cnt++;
 
 	if (not_present || write || user) {
+	// if ((not_present && write) || (not_present && user)) {
+		// printf("PF !!! \n");
 		exit(-1);
 	}
 

@@ -207,7 +207,7 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
+	// char *file_name = f_name;
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
@@ -222,12 +222,12 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
-	success = load (file_name, &_if);
-	
+	success = load (f_name, &_if);
+
 	/* **** where should sema_down ? */
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
+	palloc_free_page (f_name);
 	if (!success)
 		return -1;
 
@@ -418,12 +418,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Get a lock */
-	lock_acquire(&filesys_lock);
+	// lock_acquire(&filesys_lock);
 
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
-		lock_release(&filesys_lock);
+		// lock_release(&filesys_lock);
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
@@ -494,8 +494,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* release a lock */
-	file_deny_write(file);
-	lock_release(&filesys_lock);
+	// file_deny_write(file);
+	// lock_release(&filesys_lock);
 
 	/* Set up stack. */
 	if (!setup_stack (if_))
@@ -559,7 +559,6 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	success = true;
 	palloc_free_page(argv);
-
 done:
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);

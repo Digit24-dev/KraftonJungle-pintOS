@@ -10,9 +10,11 @@
 #include "lib/stdio.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/palloc.h"
+#include <string.h>
 
 #include "userprog/process.h"
-#include "string.h"
+// #include "string.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -91,7 +93,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 
 		case SYS_EXEC:
-			// exec();
+			address_check(arg1);
+			if (arg1 == "") exit(-1);
+			f->R.rax = exec(arg1);
 			break;
 
 		case SYS_WAIT:
@@ -287,12 +291,17 @@ thread_add_file (struct file *f)
 pid_t fork (const char *thread_name, struct intr_frame *f)
 {
 	address_check(thread_name);
-	// struct intr_frame bucket;
-	// memcpy(&thread_current()->copied_if, &thread_current()->tf, sizeof(struct intr_frame));
 	return process_fork(thread_name, f);
 }
 
 int wait (pid_t pid)
 {
 	return process_wait(pid);
+}
+
+int exec (const char *file)
+{
+	char *temp = palloc_get_page(0);
+	strlcpy(temp, file, strlen(file) + 1);
+	return process_exec(temp);
 }

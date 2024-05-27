@@ -25,6 +25,10 @@
         "malloc.h": "c",
         "debug.h": "c",
         "mmu.h": "c",
-        "pte.h": "c"
+        "pte.h": "c",
+        "palloc.h": "c",
+        "string.h": "c",
+        "directory.h": "c",
+        "stdlib.h": "c"
     }
 }
