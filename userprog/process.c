@@ -81,18 +81,41 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+	// struct thread *curr = thread_current();
+	// curr->tf.R.rbx = if_->R.rbx;
+    // curr->tf.R.rbp = if_->R.rbp;
+    // curr->tf.R.r12 = if_->R.r12;
+    // curr->tf.R.r13 = if_->R.r13;
+    // curr->tf.R.r14 = if_->R.r14;
+    // curr->tf.R.r15 = if_->R.r15;
+	// curr->tf.rsp = if_->rsp;
+
 	/* Clone current thread to new thread.*/
 	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
+	
 	if (tid == TID_ERROR)
 		return TID_ERROR;
 	
 	struct thread *child = get_child_process(tid);
-	sema_init(&child->load_sema, 0);
-
-	enum intr_level old_level = intr_disable();
+	
 	sema_down(&child->load_sema);
-	intr_set_level(old_level);
+	// printf("parent process is wake up\n");
+	
+	// if (child->is_load == false)
+	// {
+	// 	list_remove(&child->child_elem);
+	// 	palloc_free_page(child);
+	// 	return TID_ERROR;
+	// }
 
+	if (child->tid == TID_ERROR)
+	{
+		list_remove(&child->child_elem);
+		// sema_up(&child->free_sema);
+		return TID_ERROR;
+	}
+	
+	// printf("child's tid is : %d\n", tid);
 	return tid;
 }
 
@@ -115,10 +138,14 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	/* 2. Resolve VA from the parent's page map level 4. */
 	// 부모 page table에서 va에 대한 pa 반환
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL)
+		return false;
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to NEWPAGE. */
 	// 자녀 process page 할당
 	newpage = palloc_get_page(PAL_USER);
+	if (newpage == NULL)
+		return false;
 	
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
@@ -152,6 +179,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -186,6 +214,7 @@ __do_fork (void *aux) {
 				if (duplicate_file == NULL)
 				{
 					succ = false;
+					// printf("line 203 succ is change true -> false \n");
 					break;
 				}
 				current->fdt[i] = duplicate_file;
@@ -196,17 +225,25 @@ __do_fork (void *aux) {
 	else
 	{
 		succ = false;
+		// printf("line 214 succ is change true -> false \n");
 	}
-	enum intr_level old_level = intr_disable();
-	list_push_back(&parent->child_set, &current->child_elem);
-	sema_up(&current->load_sema);
-	intr_set_level(old_level);
+	// enum intr_level old_level = intr_disable();
+	// list_push_back(&parent->child_set, &current->child_elem);
 	current->parent = parent;
+	// intr_set_level(old_level);
 
+	current->is_load = succ;
+	sema_up(&current->load_sema);
+	
 	/* Finally, switch to the newly created process. */
 	if (succ)
+		if_.R.rax = 0;
+		// printf("iret start\n");
 		do_iret (&if_);
 error:
+	current->is_load = false;
+	current->tid = TID_ERROR;
+	sema_up(&current->load_sema);
 	thread_exit ();
 }
 
@@ -278,10 +315,11 @@ process_wait (tid_t child_tid UNUSED) {
 	
 	sema_down(&child->wait_sema);
 
-	if (child->is_dead)
-		return child->exit_code;
-
-	return -1;
+	int exit_code = child->exit_code;
+	list_remove(&child->child_elem);
+	// sema_up(&child->free_sema);
+	
+	return exit_code;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -292,7 +330,9 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	curr->is_dead = true;
+	sema_up(&curr->wait_sema);
+	// sema_down(&curr->free_sema);
 	process_cleanup ();
 }
 
