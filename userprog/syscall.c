@@ -15,6 +15,7 @@
 #include "include/threads/vaddr.h"
 /* customed 0524 */
 #include "include/userprog/process.h"
+#include "threads/palloc.h"
 
 struct lock filesys_lock;
 
@@ -83,11 +84,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		}
 
-		// case SYS_EXEC :
-		// {
-		// 	const char *cmd_line = f->R.rdi;
-
-		// }
+		case SYS_EXEC :
+		{
+			address_checker(arg1);
+			f->R.rax = exec(arg1);
+		}
 
 		case SYS_WAIT :
 		{
@@ -349,4 +350,22 @@ pid_t fork (const char *thread_name){
 
 int wait (pid_t pid) {
 	return process_wait(pid);
+}
+
+int exec (const char *cmd_line){
+	address_checker(cmd_line);
+	if (cmd_line == NULL)
+		exit(-1);
+	
+	char *cmd_line_tmp = palloc_get_page(0);
+	if (cmd_line_tmp == NULL)
+		exit(-1);
+
+	memcpy(cmd_line_tmp, cmd_line, strlen(cmd_line) + 1);
+
+	tid_t tid = process_exec(cmd_line_tmp);
+	if (tid == TID_ERROR)
+		exit(-1);
+
+	return tid;
 }

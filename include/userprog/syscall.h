@@ -25,3 +25,4 @@ int file_to_fd (struct file* file);
 int thread_add_file (struct file *f);
 pid_t fork (const char *thread_name);
 int wait (pid_t pid);
+int exec (const char *cmd_line);
