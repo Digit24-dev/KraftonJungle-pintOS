@@ -51,7 +51,6 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	/* customed 0523 */
 
 	uint64_t arg1 = f->R.rdi;
 	uint64_t arg2 = f->R.rsi;
@@ -155,7 +154,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		
 		default :
-			// printf ("system call!\n");
 			exit(-1);
 			break;
 	}
@@ -244,9 +242,8 @@ int read (int fd, void *buffer, unsigned length)
 		struct file *open_file = fd_to_file(fd);
 		if (open_file == NULL)
 			exit(-1);
-		// lock_acquire(&filesys_lock);
+
 		str_cnt = file_read(open_file, buffer, length);
-		// lock_release(&filesys_lock);
 		return str_cnt;
 	}
 }
@@ -344,7 +341,6 @@ int thread_add_file (struct file *f)
 /* process */
 pid_t fork (const char *thread_name){
 	address_checker(thread_name);
-	// struct intr_frame *if_ = &thread_current()->tf;
 	return process_fork(thread_name, NULL);
 }
 

@@ -158,7 +158,6 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	/* customed */
-	// thread_create ("idle", PRI_MIN, idle, &idle_started);
 	thread_create("idle", PRI_DEFAULT, idle, &idle_started);
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
@@ -254,7 +253,6 @@ thread_create (const char *name, int priority,
 	if (thread_current()->priority < t->priority) {
 		thread_yield();
 	}
-	/* customed */
 
 	return tid;
 }
@@ -289,8 +287,6 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	/* customed */
-	// list_push_back (&ready_list, &t->elem);
 	list_insert_ordered(&ready_list, &t->elem, list_higher_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -345,7 +341,6 @@ thread_exit (void) {
 	if (thread_current()->parent != NULL)
 		list_remove(&thread_current()->child_elem);
 	thread_current()->is_dead = true;
-	// palloc_free_page(thread_current());
 	sema_up(&thread_current()->wait_sema);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
@@ -364,8 +359,7 @@ thread_yield (void) {
 	/* customed */
 	if (curr != idle_thread)
 		list_insert_ordered(&ready_list, &curr->elem, list_higher_priority, NULL);
-		// list_push_back (&ready_list, &curr->elem);
-	/* customed  */
+		
 	do_schedule (THREAD_READY);		// 컨텍스트 스위치를 호출한다. 
 	intr_set_level (old_level);
 }
@@ -377,9 +371,7 @@ thread_set_priority (int new_priority) {
 	{
 		thread_current ()->original_priority = new_priority;
 		update_priority(thread_current());
-		/* customed */
 		preemption();
-		/* customed */
 	}
 }
 
@@ -515,7 +507,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->child_set);
 	sema_init(&t->wait_sema, 0);
 	sema_init(&t->load_sema, 0);
-	// sema_init(&t->free_sema, 0);
 
 	t->magic = THREAD_MAGIC;
 }
@@ -720,7 +711,6 @@ thread_sleep(int64_t tick) {
 	if (cur->status != idle_thread) {
 		cur-> wakeup_time = tick;
 		old_level = intr_disable();
-		// list_push_back(&sleep_list, &cur->elem);
 		list_insert_ordered(&sleep_list, &cur->elem,  wakeup_time_less, NULL);
 		thread_block();
 		intr_set_level(old_level);

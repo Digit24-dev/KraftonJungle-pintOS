@@ -124,7 +124,6 @@ struct thread {
 	bool is_load;
 	struct semaphore wait_sema; // wait semaphore
 	struct semaphore load_sema;
-	// struct semaphore free_sema;
 	struct intr_frame copied_if;
 
 #ifdef USERPROG
