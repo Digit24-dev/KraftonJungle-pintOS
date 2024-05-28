@@ -95,6 +95,7 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+
 	/* customed */
 	int original_priority;				/* original priority (for donation) */
 	int64_t time_to_wakeup; 			/* time to wakeup */
@@ -121,10 +122,11 @@ struct thread {
 	struct file *fp;
 
 	/* Project2 - process */
-	struct intr_frame copied_if;		/* copied intr frame */
 	bool terminated;					/* boolean thread */
-	struct semaphore sema_exit;			/* semaphore for wait */
+	struct semaphore sema_exit;			/* semaphore for exit */
 	struct semaphore sema_load;			/* semaphore for load */
+	struct semaphore sema_wait;			/* semaphore for wait */
+	struct intr_frame copied_if;		/* copied intr frame */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

@@ -224,6 +224,8 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (f_name, &_if);
 
+	sema_up(&thread_current()->sema_load);
+
 	/* If load failed, quit. */
 	palloc_free_page (f_name);
 	if (!success)
@@ -270,6 +272,7 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 
 	sema_down(&child_thread->sema_exit);
+	sema_up(&child_thread->parent_process->sema_wait);
 	
 	list_remove(&child_thread->child_elem);
 	if (child_thread->terminated)

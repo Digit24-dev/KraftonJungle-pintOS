@@ -301,5 +301,6 @@ int exec (const char *file)
 {
 	char *temp = palloc_get_page(0);
 	strlcpy(temp, file, strlen(file) + 1);
+	sema_down(&thread_current()->sema_load);
 	return process_exec(temp);
 }

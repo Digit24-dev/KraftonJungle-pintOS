@@ -328,10 +328,11 @@ thread_exit (void) {
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
 	list_remove(&thread_current()->adv_elem);
-	// if (thread_current()->parent_process != NULL)
-	// 	list_remove(&thread_current()->child_elem);
+	
 	thread_current()->terminated = true;
 	sema_up(&thread_current()->sema_exit);
+	sema_down(&thread_current()->parent_process->sema_wait);
+
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -485,6 +486,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* locks */
 	sema_init(&t->sema_exit, 0);
 	sema_init(&t->sema_load, 0);
+	sema_init(&t->sema_wait, 0);
 	t->wait_on_lock = NULL;
 	
 	/* fdt init */
