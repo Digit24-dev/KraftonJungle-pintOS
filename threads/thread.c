@@ -27,14 +27,14 @@
 
 /* customed */
 static struct list sleep_list;
-static int64_t global_min_ttw = INT64_MAX; /* global minimum time to wakeup tick */
+// static int64_t global_min_ttw = INT64_MAX; /* global minimum time to wakeup tick */
 
 /* advanced */
 static fp_float load_avg = 0;
 struct list all_thread_list;
 /* advanced */
 
-void preemption();
+void preemption(void);
 static bool time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 /* List of processes in THREAD_READY state, that is, processes
@@ -78,7 +78,7 @@ static tid_t allocate_tid (void);
 /* customed */
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
-int64_t get_thread_ttw_tick();
+int64_t get_thread_ttw_tick(void);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -493,6 +493,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 		t->fdt[i] = NULL;
 
 	/* advanced */
+	t->exit_code = -1;
 	t->nice = 0;
 	t->recent_cpu = 0;
 
@@ -754,7 +755,7 @@ void preemption()
 /* customed */
 
 /* advanced */
-void calculate_load_avg(void)
+void calculate_load_avg()
 {
     int ready_threads = list_size(&ready_list);
     if (thread_current() != idle_thread)
@@ -773,7 +774,7 @@ void calculate_priority(struct thread *t)
     }
 }
 
-void recalculate_recent_cpu(void)
+void recalculate_recent_cpu()
 {
     struct list_elem *e;
     for (e = list_begin(&all_thread_list); e != list_end(&all_thread_list); e = list_next(e))
@@ -792,7 +793,7 @@ void calculate_recent_cpu(struct thread *t)
     }
 }
 
-void recalculate_priority(void)
+void recalculate_priority()
 {
     struct list_elem *e;
     if (!list_empty(&all_thread_list))
@@ -805,7 +806,7 @@ void recalculate_priority(void)
     }
 }
 
-void recent_cpu_add_1(void)
+void recent_cpu_add_1()
 {
     struct thread *curr = thread_current();
     if (curr != idle_thread)

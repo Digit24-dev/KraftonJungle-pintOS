@@ -67,13 +67,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
-	// printf("syscall: %d\n", f->R.rax);
-	// printf("arg1: %ld\n", arg1);
-	// printf("arg2: %ld\n", arg2);
-	// printf("arg3: %ld\n", arg3);
-	// printf("arg4: %ld\n", arg4);
-	// printf("arg5: %ld\n", arg5);
-	// printf("arg6: %ld\n", arg6);
 
 	// check validity
 	switch (f->R.rax)
@@ -88,14 +81,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 
 		case SYS_FORK:
-			address_check(arg1);
+			address_check((void*)arg1);
 			f->R.rax = fork(arg1, f);
 			break;
 
 		case SYS_EXEC:
-			address_check(arg1);
+			address_check((void*)arg1);
 			if (arg1 == "") exit(-1);
-			f->R.rax = exec(arg1);
+			f->R.rax = exec((const char*)arg1);
 			break;
 
 		case SYS_WAIT:
@@ -103,18 +96,18 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 
 		case SYS_CREATE:
-			address_check(arg1);
+			address_check((void*)arg1);
 			if (arg1 == "") exit(-1);
 			f->R.rax = create((const char*)arg1, (unsigned int)arg2);
 			break;
 
 		case SYS_REMOVE:
-			address_check(arg1);
+			address_check((void*)arg1);
 			f->R.rax = remove((const char*)arg1);
 			break;
 
 		case SYS_OPEN:
-			address_check(arg1);
+			address_check((void*)arg1);
 			if (arg1 == "") exit(-1);
 			f->R.rax = open((const char*)arg1);
 			break;
@@ -124,7 +117,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 
 		case SYS_READ:
-			address_check(arg2);
+			address_check((void*)arg2);
 			f->R.rax = read((int)arg1, (void*)arg2, (unsigned int)arg3);
 			break;
 
@@ -154,6 +147,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 void halt (void)
 {
 	power_off();
+	NOT_REACHED();
 }
 
 void exit (int status)
@@ -166,7 +160,7 @@ void exit (int status)
 
 int write (int fd, const void *buffer, unsigned length)
 {
-	int str_cnt = 0;
+	unsigned int str_cnt = 0;
 	const char *p = buffer;
 	struct file *param = NULL;
 
@@ -188,7 +182,9 @@ int write (int fd, const void *buffer, unsigned length)
 	default:
 		param = fd_to_file(fd);
 		if (param == NULL) return -1;
+		lock_acquire(&filesys_lock);
 		str_cnt = file_write(param, buffer, length);
+		lock_release(&filesys_lock);
 		break;
 	}
 	return str_cnt;
@@ -222,7 +218,9 @@ int read (int fd, void *buffer, unsigned length)
 	default:
 		fp = fd_to_file(fd);
 		if (fp == NULL) exit(-1);
+		lock_acquire(&filesys_lock);
 		str_cnt = file_read(fp, buffer, length);
+		lock_release(&filesys_lock);
 		break;
 	}
 	return str_cnt;
@@ -290,7 +288,7 @@ thread_add_file (struct file *f)
 
 pid_t fork (const char *thread_name, struct intr_frame *f)
 {
-	address_check(thread_name);
+	address_check((void*)thread_name);
 	return process_fork(thread_name, f);
 }
 

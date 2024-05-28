@@ -29,6 +29,7 @@
         "palloc.h": "c",
         "string.h": "c",
         "directory.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "intr-stubs.h": "c"
     }
 }

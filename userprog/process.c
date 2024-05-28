@@ -93,13 +93,14 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	struct thread *ct = get_child_process(ret);
 
+	sema_down(&ct->sema_load);
+	
 	if (ct->tid == TID_ERROR)
 	{
 		list_remove(&ct->child_elem);
 		return TID_ERROR;
 	}
 
-	sema_down(&ct->sema_load);
 	return ret;
 }
 
@@ -181,13 +182,12 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	for (size_t i = 2; i < MAX_FDT; i++) {
-		lock_acquire(&filesys_lock);	/* ?? -> 필요한가? 아니면 스레드의 경우만 복사하면 되지 않나..? */
 		if (parent->fdt[i] != NULL) 
 			current->fdt[i] = file_duplicate(parent->fdt[i]);
 		else
 			current->fdt[i] = NULL;
-		lock_release(&filesys_lock);
 	}
+	current->nex_fd = parent->nex_fd;
 	/* copy file descriptor table */
 
 	process_init ();
@@ -224,13 +224,11 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (f_name, &_if);
 
-	/* **** where should sema_down ? */
-
 	/* If load failed, quit. */
 	palloc_free_page (f_name);
 	if (!success)
 		return -1;
-
+	
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -239,15 +237,16 @@ process_exec (void *f_name) {
 struct thread*
 get_child_process(int tid) {
 	struct list *cl = &thread_current()->child_list;
+	if (list_empty(cl)) return NULL;
 	struct list_elem *e;
-	struct thread *cthread = NULL;
+	struct thread *cthread;
 	for (e = list_begin(cl); e != list_end(cl); e = list_next(e))
 	{
 		cthread = list_entry(e, struct thread, child_elem);
 		if (cthread->tid == tid)
 			return cthread;
 	}
-	return cthread;
+	return NULL;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -270,9 +269,6 @@ process_wait (tid_t child_tid UNUSED) {
 	if (child_thread == NULL)
 		return -1;
 
-	if (child_thread->terminated)
-		return child_thread->exit_code;
-
 	sema_down(&child_thread->sema_exit);
 	
 	list_remove(&child_thread->child_elem);
@@ -290,7 +286,8 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	
+	// file_allow_write(curr->fp);
+	file_close(curr->fp);
 	process_cleanup ();
 }
 
@@ -417,9 +414,6 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
-	/* Get a lock */
-	// lock_acquire(&filesys_lock);
-
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
@@ -427,6 +421,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	t->fp = file;
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -493,10 +488,6 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
-	/* release a lock */
-	// file_deny_write(file);
-	// lock_release(&filesys_lock);
-
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -513,7 +504,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *token;
 	char *args[MAX_ARGS];
 	uintptr_t args_p[MAX_ARGS];
-	uintptr_t argv_p;
 
 	for (token = strtok_r(argv, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
 		args[argc] = token;
@@ -542,7 +532,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	{
 		if_->rsp -= sizeof(char*);
 		unsigned char **p = (void*)if_->rsp;
-		*p = args_p[i];
+		*p = (void *)args_p[i];
 	}
 
 	// argc & argv
@@ -554,15 +544,14 @@ load (const char *file_name, struct intr_frame *if_) {
 	memset(if_->rsp, 0, sizeof(void*));
 
 	// <--- argument passing ---> //
-
-	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+	file_deny_write(file);
 
 	success = true;
 	palloc_free_page(argv);
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
-	// sema_up(&t->sema_load);
+	// file_close (file);
+
 	return success;
 }
 

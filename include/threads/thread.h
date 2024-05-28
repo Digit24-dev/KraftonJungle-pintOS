@@ -118,6 +118,7 @@ struct thread {
 	/* Project2 - File Descriptor */
 	int nex_fd;
 	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct file *fp;
 
 	/* Project2 - process */
 	struct intr_frame copied_if;		/* copied intr frame */
@@ -175,12 +176,12 @@ void do_iret (struct intr_frame *tf);
 
 /* customed */
 void calculate_recent_cpu(struct thread *t);
-void recent_cpu_add_1();
-void recalculate_priority();
-void recalculate_recent_cpu();
+void recent_cpu_add_1(void);
+void recalculate_priority(void);
+void recalculate_recent_cpu(void);
 void calculate_priority(struct thread *t);
-void calculate_load_avg();
-void preemption();
+void calculate_load_avg(void);
+void preemption(void);
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);

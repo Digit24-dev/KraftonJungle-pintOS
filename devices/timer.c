@@ -21,7 +21,7 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 /* customed */
-static int64_t global_wakeup_tick = __INT64_MAX__;
+// static int64_t global_wakeup_tick = __INT64_MAX__;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -213,11 +213,11 @@ real_time_sleep (int64_t num, int32_t denom) {
 }
 
 /* customed */
-int64_t get_global_wakeup_tick() {
-	return global_wakeup_tick;
-}
+// int64_t get_global_wakeup_tick() {
+// 	return global_wakeup_tick;
+// }
 
-void set_global_wakeup_tick(int64_t set) {
-	global_wakeup_tick = MIN(set, global_wakeup_tick);
-}
+// void set_global_wakeup_tick(int64_t set) {
+// 	global_wakeup_tick = MIN(set, global_wakeup_tick);
+// }
 /* customed */

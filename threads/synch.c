@@ -34,8 +34,8 @@
 
 #define MAX_DEPTH 8
 
-void update();
-static void donate();
+void update(void);
+static void donate(void);
 bool sema_elem_func(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
