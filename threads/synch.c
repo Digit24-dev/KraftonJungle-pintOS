@@ -323,14 +323,6 @@ cond_init (struct condition *cond) {
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
 
-bool
-sema_elem_func(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED){
-	const struct thread *a = list_entry(a_, struct semaphore_elem, elem)->holder;
-	const struct thread *b = list_entry(b_, struct semaphore_elem, elem)->holder;
-
-	return a->priority > b->priority;
-}
-
 void
 cond_wait (struct condition *cond, struct lock *lock) {
 	struct semaphore_elem waiter;
