@@ -87,6 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{
 			address_checker(arg1);
 			f->R.rax = exec(arg1);
+			break;
 		}
 
 		case SYS_WAIT :
@@ -263,7 +264,13 @@ bool remove (const char *file)
 int open (const char *file)
 {
 	address_checker(file);
+	
 	struct file *open_file = filesys_open(file);
+
+	if(strcmp(thread_name(), file) == 0) {
+		file_deny_write(open_file);
+	}
+	
 	if (open_file == NULL)
 		return -1;
 	return thread_add_file(open_file);
