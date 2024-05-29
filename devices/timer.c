@@ -133,8 +133,44 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();		// update the cpu usage for running process
+
+
+	/* customed 0517 */
+	if (thread_mlfqs)
+	{
+		// 1틱마다 recent_cpu 1씩 증가
+		mlfqs_increment();
+		// recent_cpu_add_1();
+		
+		// 100틱(1초)마다 recent_cpu, load_avg update
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+
+			// recalculate_recent_cpu();
+			mlfqs_load_avg();
+			// calculate_load_avg();
+			recalculate_recent_cpu();
+			
+		}
+
+		// 4틱마다 모든 쓰레드 priority update
+		if (timer_ticks() % 4 == 0)
+		{
+			recalculate_priority();
+		}
+	}
+
 	/* customed */
-	thread_wakeup (ticks);
+	thread_wakeup(ticks);
+
+	// if (INT64_MAX <= ticks)
+	// {
+	// 	thread_wakeup(ticks);
+	// }
+
+	/* customed */
+	// thread_wakeup (ticks);
+
 	/* code to add:
 		check sleep list and the global tick.
 		find any threads to wake up.

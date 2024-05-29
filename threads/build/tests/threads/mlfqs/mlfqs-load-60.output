@@ -1,0 +1,16 @@
+Kernel command line: -q -mlfqs run mlfqs-load-60
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Kernel PANIC at ../../threads/synch.c:195 in lock_acquire(): assertion `!lock_held_by_current_thread (lock)' failed.
+Call stack: 0x8004214152 0x800420a6ff 0x800420ba42 0x800420bb46 0x800420cbc5 0x8004206232 0x80042060a3.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 0 ticks
+Thread: 0 idle ticks, 0 kernel ticks, 0 user ticks
+Console: 636 characters output
+Keyboard: 0 keys pressed
+Powering off...

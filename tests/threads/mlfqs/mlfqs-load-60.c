@@ -137,6 +137,11 @@ test_mlfqs_load_60 (void)
       load_avg = thread_get_load_avg ();
       msg ("After %d seconds, load average=%d.%02d.",
            i * 2, load_avg / 100, load_avg % 100);
+
+      // printf("nrdy_threads: %d, load_avg: %d\n", n_rdy_threads, load_avg);
+      // printf("load_avg: %d\n",  load_avg);
+
+
     }
 }
 

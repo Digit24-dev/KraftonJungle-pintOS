@@ -101,8 +101,12 @@ struct thread {
 	/* customed */
 	int original_priority;				/* original priority (for donation) */
 	int64_t time_to_wakeup; 			/* time to wakeup */
+
+	/**/	
+	int init_priority;
+	
 	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
-	struct list donations;				/* donations that points d_elem donors. */
+	struct list_elem *donations;		/* donations that points d_elem donors. */
 	struct list_elem d_elem;			/* List donors element. */
 
 	int nice;							/* nice fields */
@@ -111,23 +115,6 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-
-	/* Project2 - process hierarchy */
-	struct thread *parent_process;		/* Parent process */
-	struct list child_list;				/* List of children */
-	struct list_elem child_elem;		/* Children elem */
-	int exit_code;						/* Exit code */
-
-	/* Project2 - File Descriptor */
-	int nex_fd;
-	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
-	struct file *fp;
-
-	/* Project2 - process */
-	struct intr_frame copied_if;		/* copied intr frame */
-	bool terminated;					/* boolean thread */
-	struct semaphore sema_exit;			/* semaphore for wait */
-	struct semaphore sema_load;			/* semaphore for load */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -188,5 +175,4 @@ void preemption(void);
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-struct thread* get_thread(tid_t tid);
 #endif /* threads/thread.h */
