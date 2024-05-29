@@ -12,7 +12,7 @@
 #endif
 
 // #define USERPROG
-#define MAX_FDT	64
+#define MAX_FDT	128
 #define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -118,8 +118,9 @@ struct thread {
 
 	/* Project2 - File Descriptor */
 	int nex_fd;
-	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
-	struct file *fp;
+	// struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct file **fdt;				/* File Descriptor Table Pointer */
+	struct file *fp;					/* file pointer at running file */
 
 	/* Project2 - process */
 	bool terminated;					/* boolean thread */

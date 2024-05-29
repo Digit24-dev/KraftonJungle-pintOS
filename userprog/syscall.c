@@ -49,10 +49,7 @@ syscall_init (void) {
 
 bool
 address_check (void *pointer) {
-	// printf("NULL: %p \n", (void *)NULL);
-	// printf("pointer: %p \n", pml4_get_page(thread_current()->pml4, pointer));
-	void *pp = pml4_get_page(thread_current()->pml4, pointer);
-	if (pointer == NULL || is_kernel_vaddr(pointer) || pp == NULL)
+	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
 		exit(-1);
 }
 
@@ -267,6 +264,7 @@ void close (int fd)
 	struct file *param = fd_to_file(fd);
 	if (param == NULL) exit(-1);
 	thread_current()->fdt[fd] = NULL;
+	thread_current()->nex_fd = fd;
 	file_close(param);
 }
 
@@ -280,9 +278,17 @@ int
 thread_add_file (struct file *f)
 {
 	struct thread *cur = thread_current();
-	int ret = cur->nex_fd;
-	cur->fdt[cur->nex_fd] = f;
-	++cur->nex_fd;
+	int ret;
+	if (cur->fdt[cur->nex_fd] == NULL) {
+		cur->fdt[cur->nex_fd] = f;
+		ret = cur->nex_fd;
+	} 
+	else
+		return -1;
+
+	while (cur->nex_fd < MAX_FDT && cur->fdt[cur->nex_fd] != NULL)
+		++cur->nex_fd;
+	
 	return ret;
 }
 
@@ -299,7 +305,7 @@ int wait (pid_t pid)
 
 int exec (const char *file)
 {
-	char *temp = palloc_get_page(0);
+	char *temp = palloc_get_page(PAL_ZERO);
 	strlcpy(temp, file, strlen(file) + 1);
 	sema_down(&thread_current()->sema_load);
 	return process_exec(temp);

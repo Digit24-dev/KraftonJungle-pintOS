@@ -48,7 +48,7 @@ process_create_initd (const char *file_name) {
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page (0);
+	fn_copy = palloc_get_page (PAL_ZERO);
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
@@ -97,6 +97,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	
 	if (ct->tid == TID_ERROR)
 	{
+		sema_up(&ct->sema_exit);
 		list_remove(&ct->child_elem);
 		return TID_ERROR;
 	}
@@ -121,6 +122,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL) return false;
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
@@ -200,7 +202,9 @@ __do_fork (void *aux) {
 	}
 error:
 	sema_up(&current->sema_load);
+	thread_current()->exit_code = TID_ERROR;
 	thread_exit ();
+	// exit(-1);
 }
 
 /* Switch the current execution context to the f_name.
@@ -272,9 +276,11 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 
 	sema_down(&child_thread->sema_exit);
-	sema_up(&child_thread->parent_process->sema_wait);
 	
 	list_remove(&child_thread->child_elem);
+
+	sema_up(&child_thread->parent_process->sema_wait);
+	
 	if (child_thread->terminated)
 		return child_thread->exit_code;
 
@@ -289,7 +295,12 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	// file_allow_write(curr->fp);
+	// for (size_t i = 2; i < MAX_FDT; i++) {
+	// 	if (curr->fdt[i] != NULL) 
+	// 		file_close(curr->fdt[i]);
+	// }
+	
+	palloc_free_multiple(curr->fdt, 1);
 	file_close(curr->fp);
 	process_cleanup ();
 }
@@ -418,9 +429,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
+	lock_acquire(&filesys_lock);
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		// lock_release(&filesys_lock);
+		palloc_free_page(argv);
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
@@ -490,7 +503,7 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-
+	lock_release(&filesys_lock);
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;

@@ -149,7 +149,7 @@ page_fault (struct intr_frame *f) {
 
 	/* Count page faults. */
 	page_fault_cnt++;
-
+	// exit(-1);
 	if (not_present || write || user) {
 	// if ((not_present && write) || (not_present && user)) {
 		// printf("PF !!! \n");
