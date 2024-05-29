@@ -5,12 +5,17 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/fp-ops.h"
+#include "threads/synch.h"
 #include "threads/fixed_point.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
-
+// #define USERPROG
+#define MAX_FDT	64
+#define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING,     /* Running thread. */
@@ -92,20 +97,39 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	/* customed */
-	int64_t wakeup_time;				/* Wake up time for sleeping thread*/
-	/* customed 0512*/
-	struct lock *wait_on_lock;			/* 현재 쓰레드가 기다리고 있는 lock */
-	struct list donations;				/* 기부받은 우선순위 목록 */
-	struct list_elem d_elem;
-	int original_priority;
+
+  /* customed */
+	int original_priority;				/* original priority (for donation) */
+	int64_t time_to_wakeup; 			/* time to wakeup */
+	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
+	struct list donations;				/* donations that points d_elem donors. */
+	struct list_elem d_elem;			/* List donors element. */
+
+	int nice;							/* nice fields */
+	fp_float recent_cpu;				/* recent_cpu  */
+	struct list_elem adv_elem;			/* for list all threads */
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-	struct list_elem a_elem;
 
-	/* customed 0516 */
-	int nice;
-	int recent_cpu;
+	/* Project2 - process hierarchy */
+	struct thread *parent_process;		/* Parent process */
+	struct list child_list;				/* List of children */
+	struct list_elem child_elem;		/* Children elem */
+	int exit_code;						/* Exit code */
+
+	/* Project2 - File Descriptor */
+	int nex_fd;
+	// struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct file **fdt;				/* File Descriptor Table Pointer */
+	struct file *fp;					/* file pointer at running file */
+
+	/* Project2 - process */
+	bool terminated;					/* boolean thread */
+	struct semaphore sema_exit;			/* semaphore for exit */
+	struct semaphore sema_load;			/* semaphore for load */
+	struct semaphore sema_wait;			/* semaphore for wait */
+	struct intr_frame copied_if;		/* copied intr frame */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -155,21 +179,17 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
-void thread_sleep(int64_t ticks);
-void thread_wakeup(int64_t ticks);
-bool list_higher_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-static bool wakeup_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-void preemption(void);
 
-void calculate_load_avg(void);
+/* customed */
 void calculate_recent_cpu(struct thread *t);
-void calculate_priority(struct thread *t);
-void recalculate_recent_cpu(void);
-void recalculate_priority(void);
 void recent_cpu_add_1(void);
-
-bool
-d_list_higher_priority (const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED);
-
+void recalculate_priority(void);
+void recalculate_recent_cpu(void);
+void calculate_priority(struct thread *t);
+void calculate_load_avg(void);
+void preemption(void);
+void thread_sleep(int64_t tick);
+void thread_wakeup(int64_t tick);
+bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+struct thread* get_thread(tid_t tid);
 #endif /* threads/thread.h */
