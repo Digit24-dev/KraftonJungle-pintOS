@@ -12,6 +12,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/fp-ops.h"
+// #include "threads/fixed_point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -124,16 +125,21 @@ thread_init (void) {
 
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
-	list_init (&ready_list);
+	list_init (&ready_list); 
 	list_init (&destruction_req);
 	/* customed */
 	list_init (&sleep_list);
+
 	/* advanced */
 	list_init (&all_thread_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
+	
+	/* ====================== customed for advanced ======================*/
+	list_push_back(&all_list, &initial_thread->a_elem);
+
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 	list_push_back(&all_thread_list, &initial_thread->adv_elem);
@@ -151,6 +157,9 @@ thread_start (void) {
 	thread_create("idle", PRI_DEFAULT, idle, &idle_started);
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
+	
+	/* ====================== customed for advanced ======================*/
+	load_avg = 0;
 
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down (&idle_started);
@@ -161,7 +170,6 @@ thread_start (void) {
 void
 thread_tick (void) {
 	struct thread *t = thread_current ();
-
 	/* Update statistics. */
 	if (t == idle_thread)
 		idle_ticks++;
@@ -243,7 +251,6 @@ thread_create (const char *name, int priority,
 	if (thread_current()->priority < t->priority)
 		thread_yield();
 
-// printf("%s created %s. (%d) \n", thread_current()->name, t->name, tid);
 	return tid;
 }
 
@@ -326,6 +333,12 @@ thread_exit (void) {
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
+
+	/* ====================== customed for advanced ======================*/
+	enum intr_level old_level = intr_disable();
+	list_remove(&thread_current()->a_elem);
+	intr_set_level(old_level);
+
 	intr_disable ();
 	list_remove(&thread_current()->adv_elem);
 	
@@ -375,7 +388,10 @@ thread_get_priority (void) {
 	return thread_current ()->priority;
 }
 
+/* ====================== customed for advanced ======================*/
+
 /* Sets the current thread's nice value to NICE. */
+// thread nice 설정
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
@@ -383,6 +399,7 @@ thread_set_nice (int nice UNUSED) {
 }
 
 /* Returns the current thread's nice value. */
+// thread nice 가져오는 동작
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
@@ -390,6 +407,7 @@ thread_get_nice (void) {
 }
 
 /* Returns 100 times the system load average. */
+// load_avg 가져오는 동작 (100씩 곱해줘야 함)
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
@@ -399,7 +417,9 @@ thread_get_load_avg (void) {
 	return ret;
 }
 
+
 /* Returns 100 times the current thread's recent_cpu value. */
+// thread recent_cpu 가져오는 동작 (100씩 곱해줘야 함)
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
@@ -685,10 +705,10 @@ void
 thread_sleep(int64_t tick) {
 	struct thread* cur = thread_current();
 	enum intr_level old_level;
-	
-	ASSERT (!intr_context ());
 
-	if (cur->status != idle_thread) {
+  ASSERT (!intr_context ());
+
+	if (cur != idle_thread) {
 		cur->time_to_wakeup = tick;
 		old_level = intr_disable();
 		list_insert_ordered(&sleep_list, &cur->elem, time_to_wakeup_less, NULL);
@@ -722,6 +742,7 @@ thread_wakeup(int64_t tick) {
 }
 
 static bool
+
 time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
 {

@@ -7,6 +7,8 @@
 #include "threads/interrupt.h"
 #include "threads/fp-ops.h"
 #include "threads/synch.h"
+#include "threads/fixed_point.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -96,7 +98,7 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
-	/* customed */
+  /* customed */
 	int original_priority;				/* original priority (for donation) */
 	int64_t time_to_wakeup; 			/* time to wakeup */
 	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
@@ -118,8 +120,9 @@ struct thread {
 
 	/* Project2 - File Descriptor */
 	int nex_fd;
-	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
-	struct file *fp;
+	// struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct file **fdt;				/* File Descriptor Table Pointer */
+	struct file *fp;					/* file pointer at running file */
 
 	/* Project2 - process */
 	bool terminated;					/* boolean thread */
@@ -175,6 +178,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
 
 /* customed */
 void calculate_recent_cpu(struct thread *t);
