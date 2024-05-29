@@ -8,3 +8,4 @@ threads_SRC += threads/malloc.c		# Subpage allocator.
 threads_SRC += threads/start.S		# Startup code.
 threads_SRC += threads/mmu.c		    # Memory management unit related things.
 threads_SRC += threads/fp-ops.c
+threads_SRC += threads/fixed_point.c
