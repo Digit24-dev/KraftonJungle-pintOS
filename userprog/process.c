@@ -80,13 +80,11 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
-	tid_t ret;
 	struct thread *cur = thread_current();
 	memcpy(&cur->copied_if, if_, sizeof(struct intr_frame));
 
 	/* Clone current thread to new thread.*/
-	ret = thread_create (name,
-			PRI_DEFAULT, __do_fork, cur);
+	tid_t ret = thread_create (name, PRI_DEFAULT, __do_fork, cur);
 	
 	if (ret == TID_ERROR)
 		return TID_ERROR;
@@ -95,10 +93,10 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	sema_down(&ct->sema_load);
 	
-	if (ct->tid == TID_ERROR)
+	if (ct->exit_code == TID_ERROR)
 	{
-		sema_up(&ct->sema_exit);
 		list_remove(&ct->child_elem);
+		sema_up(&ct->sema_exit);
 		return TID_ERROR;
 	}
 
@@ -202,9 +200,7 @@ __do_fork (void *aux) {
 	}
 error:
 	sema_up(&current->sema_load);
-	thread_current()->exit_code = TID_ERROR;
-	thread_exit ();
-	// exit(-1);
+	exit(TID_ERROR);
 }
 
 /* Switch the current execution context to the f_name.
@@ -227,13 +223,13 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (f_name, &_if);
+	if (!success)
+		return -1;
 
 	sema_up(&thread_current()->sema_load);
 
 	/* If load failed, quit. */
 	palloc_free_page (f_name);
-	if (!success)
-		return -1;
 	
 	/* Start switched process. */
 	do_iret (&_if);
@@ -276,15 +272,10 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 
 	sema_down(&child_thread->sema_exit);
-	
 	list_remove(&child_thread->child_elem);
-
 	sema_up(&child_thread->parent_process->sema_wait);
 	
-	if (child_thread->terminated)
-		return child_thread->exit_code;
-
-	return -1;
+	return child_thread->exit_code;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -295,14 +286,18 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	// for (size_t i = 2; i < MAX_FDT; i++) {
-	// 	if (curr->fdt[i] != NULL) 
-	// 		file_close(curr->fdt[i]);
-	// }
+	for (size_t i = 2; i < MAX_FDT; i++) {
+		if (curr->fdt[i] != NULL) 
+			file_close(curr->fdt[i]);
+	}
+	process_cleanup ();
+	
+	file_close(curr->fp);
 	
 	palloc_free_multiple(curr->fdt, 1);
-	file_close(curr->fp);
-	process_cleanup ();
+	
+	sema_up(&thread_current()->sema_exit);
+	sema_down(&thread_current()->parent_process->sema_wait);
 }
 
 /* Free the current process's resources. */
@@ -560,7 +555,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	memset(if_->rsp, 0, sizeof(void*));
 
 	// <--- argument passing ---> //
-	file_deny_write(file);
+	// file_deny_write(file);
 
 	success = true;
 	palloc_free_page(argv);
