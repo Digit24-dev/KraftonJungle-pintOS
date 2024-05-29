@@ -1,0 +1,26 @@
+Kernel command line: -q -f put multi-oom run multi-oom
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  157,081,600 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'multi-oom' into the file system...
+Executing 'multi-oom':
+(multi-oom) begin
+child_0_O: exit(-1)
+Kernel PANIC at ../../threads/palloc.c:305 in palloc_free_multiple(): assertion `pg_ofs (pages) == 0' failed.
+Call stack: 0x8004218560 0x800420bc5c 0x800420bdff 0x800420d310 0x800421c2d0 0x800421c26c 0x80042071cc 0x800421d9bd 0x800421d595 0x800421d7ae 0x800421d453child_0_O: exit(-1)
+Kernel PANIC recursion at ../../filesys/inode.c:304 in inode_allow_write().
+Timer: 81 ticks
+Thread: 45 idle ticks, 28 kernel ticks, 8 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 281 reads, 242 writes
+hd1:0: 107 reads, 0 writes
+Console: 1151 characters output
+Key

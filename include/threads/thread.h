@@ -1,15 +1,22 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
+
+#define USERPROG
+
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/fixed_point.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
-
+// #define USERPROG
+#define MAX_FDT	64
+#define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING,     /* Running thread. */
@@ -92,13 +99,35 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	/* customed */
+	int original_priority;				/* original priority (for donation) */
 	int64_t time_to_wakeup; 			/* time to wakeup */
 	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
-	struct list_elem *donations;		/* donations that points d_elem donors. */
+	struct list donations;				/* donations that points d_elem donors. */
 	struct list_elem d_elem;			/* List donors element. */
+
+	int nice;							/* nice fields */
+	int recent_cpu;				/* recent_cpu  */
+	struct list_elem adv_elem;			/* for list all threads */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+	/* Project2 - process hierarchy */
+	struct thread *parent_process;		/* Parent process */
+	struct list child_list;				/* List of children */
+	struct list_elem child_elem;		/* Children elem */
+	int exit_code;						/* Exit code */
+
+	/* Project2 - File Descriptor */
+	int nex_fd;
+	struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct file *fp;
+
+	/* Project2 - process */
+	struct intr_frame copied_if;		/* copied intr frame */
+	bool terminated;					/* boolean thread */
+	struct semaphore sema_exit;			/* semaphore for wait */
+	struct semaphore sema_load;			/* semaphore for load */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -149,7 +178,15 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 /* customed */
+void calculate_recent_cpu(struct thread *t);
+void recent_cpu_add_1(void);
+void recalculate_priority(void);
+void recalculate_recent_cpu(void);
+void calculate_priority(struct thread *t);
+void calculate_load_avg(void);
+void preemption(void);
 void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 bool list_higher_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+struct thread* get_thread(tid_t tid);
 #endif /* threads/thread.h */

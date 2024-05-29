@@ -1,0 +1,15 @@
+FAIL
+Kernel panic in run: PANIC at ../../threads/palloc.c:305 in palloc_free_multiple(): assertion `pg_ofs (pages) == 0' failed.
+Call stack: 0x8004218560 0x800420bc5c 0x800420bdff 0x800420d310 0x800421c2d0 0x800421c26c 0x80042071cc 0x800421d9bd 0x800421d595 0x800421d7ae 0x800421d453c
+Translation of call stack:
+0x0000008004218560: debug_panic (lib/kernel/debug.c:32)
+0x000000800420bc5c: palloc_free_multiple (threads/palloc.c:306)
+0x000000800420bdff: palloc_free_page (threads/palloc.c:329)
+0x000000800420d310: pml4_destroy (threads/mmu.c:199)
+0x000000800421c2d0: process_cleanup (userprog/process.c:319)
+0x000000800421c26c: process_exit (userprog/process.c:292)
+0x00000080042071cc: thread_exit (threads/thread.c:289)
+0x000000800421d9bd: write (userprog/syscall.c:160)
+0x000000800421d595: address_check (userprog/syscall.c:56)
+0x000000800421d7ae: syscall_handler (userprog/syscall.c:109)
+0x00000800421d453c: (unknown)

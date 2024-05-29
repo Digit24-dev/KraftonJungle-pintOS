@@ -1,0 +1,59 @@
+Kernel command line: -q -f put syn-read put child-syn-read run syn-read
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  209,510,400 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 225 sector (112 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'syn-read' into the file system...
+Putting 'child-syn-read' into the file system...
+Executing 'syn-read':
+(syn-read) begin
+(syn-read) create "data"
+(syn-read) open "data"
+(syn-read) write "data"
+(syn-read) close "data"
+(syn-read) exec child 1 of 10: "child-syn-read 0"
+(syn-read) exec child 2 of 10: "child-syn-read 1"
+(syn-read) exec child 3 of 10: "child-syn-read 2"
+(syn-read) exec child 4 of 10: "child-syn-read 3"
+(syn-read) exec child 5 of 10: "child-syn-read 4"
+(syn-read) exec child 6 of 10: "child-syn-read 5"
+(syn-read) exec child 7 of 10: "child-syn-read 6"
+(syn-read) exec child 8 of 10: "child-syn-read 7"
+(syn-read) exec child 9 of 10: "child-syn-read 8"
+(syn-read) exec child 10 of 10: "child-syn-read 9"
+child-syn-read: exit(0)
+(syn-read) wait for child 1 of 10 returned 0 (expected 0)
+child-syn-read: exit(8)
+child-syn-read: exit(9)
+child-syn-read: exit(2)
+child-syn-read: exit(3)
+child-syn-read: exit(5)
+child-syn-read: exit(1)
+(syn-read) wait for child 2 of 10 returned 1 (expected 1)
+Interrupt 0x0d (#GP General Protection Exception) at rip=800421c168
+ cr2=0000000000000000 error=               0
+rax cccccccccccccc1c rbx 0000000000000000 rcx 0000000000403818 rdx 0000000000000020
+rsp 0000008004240e60 rbp 0000008004240e90 rsi 0000000000000000 rdi 0000008004240090
+rip 000000800421c168 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
+r11 0000000000000216 r12 000000800421d598 r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00000292
+es: 001b ds: 001b cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:98 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004218560 0x800421d23c 0x8004209333 0x8004209751 0x800421c1c8 0x800421de7e 0x800421d6f3 0x800421d453 0x4007b9 0x4002be 0x400fa7 0x400ff0.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 389 ticks
+Thread: 233 idle ticks, 40 kernel ticks, 116 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 7719 reads, 504 writes
+hd1:0: 225 reads, 0 writes
+Console: 2650 characters output
+Key

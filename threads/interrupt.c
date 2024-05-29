@@ -36,7 +36,7 @@
 struct gate {
 	unsigned off_15_0 : 16;   // low 16 bits of offset in segment
 	unsigned ss : 16;         // segment selector
-	unsigned ist : 3;        // # args, 0 for interrupt/trap gates
+	unsigned ist : 3;         // # args, 0 for interrupt/trap gates
 	unsigned rsv1 : 5;        // reserved(should be zero I guess)
 	unsigned type : 4;        // type(STS_{TG,IG32,TG32})
 	unsigned s : 1;           // must be 0 (system)
