@@ -337,8 +337,8 @@ thread_exit (void) {
 	list_remove(&thread_current()->adv_elem);
 	
 	thread_current()->terminated = true;
-	// sema_up(&thread_current()->sema_exit);
-	// sema_down(&thread_current()->sema_wait);
+	sema_up(&thread_current()->sema_exit);
+	sema_down(&thread_current()->sema_wait);
 
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();

@@ -286,7 +286,7 @@ thread_add_file (struct file *f)
 	else
 		return -1;
 
-	while (cur->nex_fd < MAX_FDT && cur->fdt[cur->nex_fd] != NULL)
+	while (cur->nex_fd < MAX_FDT - 1 && cur->fdt[cur->nex_fd] != NULL)
 		++cur->nex_fd;
 	
 	return ret;
@@ -306,8 +306,6 @@ int wait (pid_t pid)
 int exec (const char *file)
 {
 	char *temp = palloc_get_page(PAL_ZERO);
-	if (temp == NULL)
-		exit(-1);
 	strlcpy(temp, file, strlen(file) + 1);
 	sema_down(&thread_current()->sema_load);
 	return process_exec(temp);
