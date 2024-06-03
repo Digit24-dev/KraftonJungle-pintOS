@@ -5,23 +5,26 @@
 #include "vm/inspect.h"
 /* Project 3 */
 #include "threads/mmu.h"
+#include "vm/uninit.c"
+#include "vm/file.c"
+#include "vm/anon.c"
 
 /* Project 3 */
 uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
     // elem의 필드를 사용하여 해시 값을 계산하여 반환
-	const struct page *p = hash_entry(e, struct page, hash_elem);
+	const struct page *p = hash_entry(e, struct page, h_elem);
 	return hash_bytes(&p->va, sizeof p->va);
 }
 bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_, void *aux){
-	const struct page *a = hash_entry(a_, struct page, hash_elem);
-	const struct page *b = hash_entry(b_, struct page, hash_elem);
+	const struct page *a = hash_entry(a_, struct page, h_elem);
+	const struct page *b = hash_entry(b_, struct page, h_elem);
 	return a->va < b->va;
 }
 
 /* Performs some operation on hash element E, given auxiliary
  * data AUX. */
 void hash_action_func_impl (struct hash_elem *e, void *aux){
-	struct page *p = hash_entry(e, struct page, hash_elem);
+	struct page *p = hash_entry(e, struct page, h_elem);
 	free(p);
 }
 
@@ -69,13 +72,38 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
-	/* Check wheter the upage is already occupied or not. */
+	/* upage가 이미 사용 중인지 여부를 확인합니다. */
 	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: Create the page, fetch the initialier according to the VM type,
-		 * TODO: and then create "uninit" page struct by calling uninit_new. You
-		 * TODO: should modify the field after calling the uninit_new. */
+		/* TODO: 페이지를 생성하고 VM 유형에 따라 초기화기를 가져오고,
+		 * TODO: uninit_new를 호출하여 "uninit" 페이지 구조체를 만듭니다.
+		 * TODO: uninit_new를 호출한 후에 필드를 수정해야 합니다. */
+		upage = (struct page *)palloc_get_page(PAL_USER || PAL_ZERO);
+		
+		switch (type)
+		{
+		case 0: 
+			/* code VM_UNINIT */
+			uninit_initialize(upage, aux);
+			break;
+		case 1:
+			/* code ANON */
+			anon_initializer((struct page *)upage, type, ((struct page *)upage)->va); // 세번째 인자 잘 모르겠음
+			break;
+		case 2:
+			/* code FILE */
+			file_backed_initializer((struct page *)upage, type, ((struct page *)upage)->va); // 세번째 인자 잘 모르겠음
+			break;
+		case 3:
+			/* code CACHE */
+			// Project 4에서 쓸거니까 평생볼일없음 퉤퉤
+			break;
+		}
 
-		/* TODO: Insert the page into the spt. */
+		// page_get_type(upage);
+		uninit_new(upage, &upage, init, type, aux, false);
+		/* TODO: 페이지를 spt에 삽입합니다. */
+		// 맞는지 모르겠음
+		hash_insert(&spt->hash_brown, &((struct page *) upage)->h_elem);
 	}
 err:
 	return false;
@@ -87,12 +115,14 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
 	/* Project 3 */
-	uint64_t va_hash = hash_int(&va);
+	page = pml4_get_page(&thread_current()->pml4 ,va);
+	if (page == NULL) return page;
 
-	struct hash_elem *e = hash_find(&spt->hash, &va_hash);
+	struct hash_elem *e = hash_find(&spt->hash_brown, &page->h_elem);
 	if(e != NULL)
-		page = hash_entry(e, struct page, hash_elem);
-	return page;
+		return page;
+	else 
+		return NULL;
 }
 
 /* Insert PAGE into spt with validation. */
@@ -101,8 +131,8 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page U
 	int succ = false;
 	/* TODO: Fill this function. */
 	/* Project 3 */
-	if ( hash_find(&spt->hash, &page->hash_elem) == NULL ){
-		hash_insert(&spt->hash, &page->hash_elem);
+	if ( hash_find(&spt->hash_brown, &page->h_elem) == NULL ){
+		hash_insert(&spt->hash_brown, &page->h_elem);
 		succ = true;
 	}
 	return succ;
@@ -183,8 +213,11 @@ bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
-
 	page = palloc_get_page(PAL_USER || PAL_ZERO);
+	
+	uint64_t *pml4 = thread_current()->pml4;
+	
+	pml4_set_page(pml4,page, va, 1);
 
 	return vm_do_claim_page (page);
 }
@@ -199,8 +232,10 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	uint64_t pml4 = pml4_create();
+	uint64_t *pml4 = thread_current()->pml4;
 	uint64_t *pte = pml4e_walk (pml4, (uint64_t) page, 1);
+	// pte
+
 
 	return swap_in (page, frame->kva);
 }
@@ -209,7 +244,7 @@ vm_do_claim_page (struct page *page) {
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 	/* Project 3 */
-	hash_init(&spt->hash, hash_hash_func_impl, hash_less_func_impl, NULL);
+	hash_init(&spt->hash_brown, hash_hash_func_impl, hash_less_func_impl, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -225,5 +260,5 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	/* Project 3 */
-	hash_destroy(&spt->hash, hash_action_func_impl);
+	hash_destroy(&spt->hash_brown, hash_action_func_impl);
 }
