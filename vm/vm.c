@@ -3,6 +3,27 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+/* Project 3 */
+#include "threads/mmu.h"
+
+/* Project 3 */
+uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
+    // elem의 필드를 사용하여 해시 값을 계산하여 반환
+	const struct page *p = hash_entry(e, struct page, hash_elem);
+	return hash_bytes(&p->va, sizeof p->va);
+}
+bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_, void *aux){
+	const struct page *a = hash_entry(a_, struct page, hash_elem);
+	const struct page *b = hash_entry(b_, struct page, hash_elem);
+	return a->va < b->va;
+}
+
+/* Performs some operation on hash element E, given auxiliary
+ * data AUX. */
+void hash_action_func_impl (struct hash_elem *e, void *aux){
+	struct page *p = hash_entry(e, struct page, hash_elem);
+	free(p);
+}
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -65,17 +86,25 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
+	/* Project 3 */
+	uint64_t va_hash = hash_int(&va);
 
+	struct hash_elem *e = hash_find(&spt->hash, &va_hash);
+	if(e != NULL)
+		page = hash_entry(e, struct page, hash_elem);
 	return page;
 }
 
 /* Insert PAGE into spt with validation. */
 bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
+spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
-
+	/* Project 3 */
+	if ( hash_find(&spt->hash, &page->hash_elem) == NULL ){
+		hash_insert(&spt->hash, &page->hash_elem);
+		succ = true;
+	}
 	return succ;
 }
 
@@ -112,6 +141,7 @@ static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
+	frame = palloc_get_page(PAL_USER || PAL_ZERO);
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -154,6 +184,8 @@ vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
 
+	page = palloc_get_page(PAL_USER || PAL_ZERO);
+
 	return vm_do_claim_page (page);
 }
 
@@ -167,6 +199,8 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	uint64_t pml4 = pml4_create();
+	uint64_t *pte = pml4e_walk (pml4, (uint64_t) page, 1);
 
 	return swap_in (page, frame->kva);
 }
@@ -174,12 +208,15 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	/* Project 3 */
+	hash_init(&spt->hash, hash_hash_func_impl, hash_less_func_impl, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct supplemental_page_table *src UNUSED) {
+	/* Project 3 */
+
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -187,4 +224,6 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	/* Project 3 */
+	hash_destroy(&spt->hash, hash_action_func_impl);
 }

@@ -9,6 +9,8 @@
 #include "threads/synch.h"
 #include "threads/fixed_point.h"
 
+#define VM // 나중에 지울 것.
+
 #ifdef VM
 #include "vm/vm.h"
 #endif

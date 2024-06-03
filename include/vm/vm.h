@@ -2,18 +2,20 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+/* Project 3 */
+#include "lib/kernel/hash.h"
 
 enum vm_type {
-	/* page not initialized */
-	VM_UNINIT = 0,
-	/* page not related to the file, aka anonymous page */
-	VM_ANON = 1,
+	/* page not initialized */ 
+	VM_UNINIT = 0, // 초기화 되지 않은 페이지 
+	/* page not related to the file, aka anonymous page */ 
+	VM_ANON = 1, // 파일과 관계없는 페이지, 이름하야 익명 페이지
 	/* page that realated to the file */
-	VM_FILE = 2,
+	VM_FILE = 2, // 파일과 관계된 페이지
 	/* page that hold the page cache, for project 4 */
-	VM_PAGE_CACHE = 3,
+	VM_PAGE_CACHE = 3, // 페이지 캐시 
 
-	/* Bit flags to store state */
+	/* Bit flags to store state */ // 상태 저장용 비트 플래그
 
 	/* Auxillary bit flag marker for store information. You can add more
 	 * markers, until the value is fit in the int. */
@@ -46,6 +48,7 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	struct hash_elem hash_elem;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -61,8 +64,8 @@ struct page {
 
 /* The representation of "frame" */
 struct frame {
-	void *kva;
-	struct page *page;
+	void *kva; // 커널 가상주소
+	struct page *page; // 페이지 구조체 담기위한 필드
 };
 
 /* The function table for page operations.
@@ -85,6 +88,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct hash hash;
 };
 
 #include "threads/thread.h"
@@ -92,8 +96,7 @@ void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
 		struct supplemental_page_table *src);
 void supplemental_page_table_kill (struct supplemental_page_table *spt);
-struct page *spt_find_page (struct supplemental_page_table *spt,
-		void *va);
+struct page *spt_find_page (struct supplemental_page_table *spt, void *va);
 bool spt_insert_page (struct supplemental_page_table *spt, struct page *page);
 void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 

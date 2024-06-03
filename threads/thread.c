@@ -480,6 +480,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->original_priority = priority;
 	t->time_to_wakeup = 0;
 	list_init(&t->donations);
+	/* Project 3 */
 
 	/* process init */
 	t->terminated = false;
