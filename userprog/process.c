@@ -18,11 +18,13 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#define VM 
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
 #define MAX_ARGS 25
+
 
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
@@ -706,13 +708,49 @@ install_page (void *upage, void *kpage, bool writable) {
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
+struct load_file_temp{
+	uint32_t read_bytes; // 총 읽어야 할 바이트
+	uint32_t total_read_bytes; // 총 읽은 바이트 => 다음에 읽어야 할 바이트 
+	uint32_t page_read_bytes; // 이번에 읽어야 할 바이트
+	
+	struct file* file;
+
+	uint8_t *ofs; // 프레임 물리주소
+	uint8_t *upage; // 페이지 가상주소
+	bool writable; // 읽/쓰 권한
+	bool is_first_load; // 최초 로드시에는 지연 로딩 필요 없음
+};
 
 static bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	struct load_file_temp* lft = (struct load_file_temp*) aux;
+	// if(lft->is_first_load){
+		/* Get a page of memory. */
+		uint8_t *kpage = palloc_get_page (PAL_USER);
+		if (kpage == NULL)
+			return false;
+		
+		/* Load this page. */
+		if (file_read (lft->file, kpage, lft->page_read_bytes) != (int) lft->page_read_bytes) {
+			palloc_free_page (kpage);
+			return false;
+		}
+		memset (kpage + lft->page_read_bytes, 0, lft->total_read_bytes);
+		
+		/* Add the page to the process's address space. */
+		if (!pml4_set_page(thread_current()->pml4, page, kpage, lft->writable)) {
+			printf("fail\n");
+			palloc_free_page (kpage);
+			return false;
+		}
+	// }
+
 }
+
+
 
 /* 파일의 OFS 오프셋에서 UPAGE 주소로 시작하는 세그먼트를 로드합니다. 
 총 READ_BYTES + ZERO_BYTES 바이트의 가상 메모리가 다음과 같이 초기화됩니다:
@@ -730,6 +768,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	struct load_file_temp *load_file_temp;
+	load_file_temp->read_bytes = zero_bytes;
+	load_file_temp->writable = writable;
+	load_file_temp->file = file;
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -738,7 +780,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+		load_file_temp->is_first_load = read_bytes == 0?true:false;
+		load_file_temp->ofs = ofs;
+		load_file_temp->total_read_bytes = read_bytes == 0?read_bytes:load_file_temp->read_bytes+read_bytes;
+		load_file_temp->page_read_bytes = page_read_bytes;
+		load_file_temp->upage = upage;
+		void *aux = load_file_temp; 
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux))
 			return false;
@@ -761,6 +808,14 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	
+	// struct page *page = pml4_get_page(thread_current()->pml4, stack_bottom);
+	void *page = palloc_get_page (PAL_USER | PAL_ZERO);
+	
+	if( pml4_set_page(thread_current()->pml4, stack_bottom, page, true) )
+		if_->rsp = USER_STACK;
+	else
+		palloc_free_page(page);
 
 	return success;
 }

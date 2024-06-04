@@ -5,10 +5,10 @@
 #include "vm/inspect.h"
 /* Project 3 */
 #include "threads/mmu.h"
-#include "vm/uninit.c"
-#include "vm/file.c"
-#include "vm/anon.c"
-#include "userprog/process.c"
+#include "vm/uninit.h"
+#include "vm/file.h"
+#include "vm/anon.h"
+
 
 
 /* Project 3 */
@@ -80,23 +80,19 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: uninit_new를 호출하여 "uninit" 페이지 구조체를 만듭니다.
 		 * TODO: uninit_new를 호출한 후에 필드를 수정해야 합니다. */
 		// FRAME
-		uint64_t* kva = palloc_get_page(PAL_USER | PAL_ZERO);
+		struct page* new_page = palloc_get_page(PAL_USER | PAL_ZERO);
 		
 		switch (type)
 		{
-		case VM_UNINIT: 
-			/* code VM_UNINIT */
-			uninit_new(upage, &upage, init, type, aux, uninit_initialize(upage, kva));
-			break;
 		case VM_ANON:
 			/* code ANON */
 			// 세번째 인자 잘 모르겠음
-			uninit_new(upage, &upage, init, type, aux, anon_initializer((struct page *)upage, type, kva));
+			uninit_new(upage, new_page, init, type, aux, anon_initializer);
 			break;
 		case VM_FILE:
 			/* code FILE */
-			; // 세번째 인자 잘 모르겠음
-			uninit_new(upage, &upage, init, type, aux, file_backed_initializer((struct page *)upage, type, kva));
+			// 세번째 인자 잘 모르겠음
+			uninit_new(upage, new_page, init, type, aux, file_backed_initializer);
 			break;
 		case VM_PAGE_CACHE:
 			/* code CACHE */
@@ -107,8 +103,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		// page_get_type(upage);
 		/* TODO: 페이지를 spt에 삽입합니다. */
 		// 맞는지 모르겠음
-		if ( spt_insert_page(spt, (struct page *)kva) ){
-			free(kva);
+		new_page->writable = writable;
+		if ( !spt_insert_page(spt, new_page) ){
+			free(new_page);
 			goto err;
 		}
 		// hash_insert(&spt->hash_brown, &((struct page *) upage)->h_elem);
@@ -138,6 +135,7 @@ bool
 spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
+	printf("^_^_^_^_^_^_^_^_^_^!!삽입\n");
 	/* Project 3 */
 	if ( hash_find(&spt->hash_brown, &page->h_elem) == NULL ){
 		hash_insert(&spt->hash_brown, &page->h_elem);
@@ -179,7 +177,7 @@ static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
-	frame = palloc_get_page(PAL_USER || PAL_ZERO);
+	frame = palloc_get_page(PAL_USER | PAL_ZERO);
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -203,12 +201,13 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+
 	page = pml4_get_page(&thread_current()->pml4, addr);
+	// page = spt_find_page(&thread_current()->spt, addr);
 	
 	/* TODO: Your code goes here */
 	void *aux = NULL;
-	//vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux)
-	if( !vm_alloc_page_with_initializer( page_get_type(page), page, is_writable((uint64_t *)page), lazy_load_segment, aux ) ){
+	if( !vm_alloc_page_with_initializer( page_get_type(page), page, is_writable((uint64_t *)page), (page, addr), aux ) ){
 		return false;
 	}
 
@@ -228,7 +227,7 @@ bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
-	page = palloc_get_page(PAL_USER || PAL_ZERO);
+	page = palloc_get_page(PAL_USER | PAL_ZERO);
 	
 	uint64_t *pml4 = thread_current()->pml4;
 	
@@ -248,7 +247,9 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	uint64_t *pml4 = thread_current()->pml4;
-	uint64_t *pte = pml4e_walk (pml4, (uint64_t) page, 1);
+	if( !pml4_set_page(pml4, page, frame->kva, page->writable) )
+		return false;
+	// uint64_t *pte = pml4e_walk (pml4, (uint64_t) page, 1);
 	// pte
 
 
@@ -276,4 +277,5 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	 * TODO: writeback all the modified contents to the storage. */
 	/* Project 3 */
 	hash_destroy(&spt->hash_brown, hash_action_func_impl);
+	
 }

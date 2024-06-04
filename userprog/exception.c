@@ -11,7 +11,7 @@
 #include "vm/vm.h"
 
 /* Number of page faults processed. */
-static long long page_fault_cnt;
+long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
@@ -159,21 +159,14 @@ page_fault (struct intr_frame *f) {
 		exit(-1);
 	}
 
-	/* Project 3 */
-	if( vm_try_handle_fault( f,fault_addr, user, write, not_present ) ){
-		// 뭔가 한다.
-		// 콘텐츠를 로드하고 유저 프로그램에게 제어권을 반환해야 한다.
-		// case in uninit-page
-		// 여기서 하는게 아니라 vm_try_handle_fault 함수 안의 함수 에서 해야 함
-	}else{
-		/* If the fault is true fault, show info and exit. */
-		printf ("Page fault at %p: %s error %s page in %s context.\n",
-				fault_addr,
-				not_present ? "not present" : "rights violation",
-				write ? "writing" : "reading",
-				user ? "user" : "kernel");
-		kill (f);
-	}
+	
+	/* If the fault is true fault, show info and exit. */
+	printf ("Page fault at %p: %s error %s page in %s context.\n",
+			fault_addr,
+			not_present ? "not present" : "rights violation",
+			write ? "writing" : "reading",
+			user ? "user" : "kernel");
+	kill (f);
 
 }
 

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 /* Project 3 */
-#include "lib/kernel/hash.h"
+#include <hash.h>
 
 enum vm_type {
 	/* page not initialized */ 
@@ -29,6 +29,7 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -43,15 +44,21 @@ struct thread;
  * uninit_page, file_page, anon_page, and page cache (project4).
  * DO NOT REMOVE/MODIFY PREDEFINED MEMBER OF THIS STRUCTURE. */
 struct page {
-	const struct page_operations *operations;
+	const struct page_operations *operations; /* 여기서 스왑및 기타 연산을 다룰 것 */
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
 	struct hash_elem h_elem;
 
+	bool is_loaded; /* 물리 메모리의 탑재 여부 */
+	bool writable; /* 쓰기 가능 여부 */
 	/* Memory Mapped File 에서 다룰 예정 */
 	struct list_elem mmap_elem; /* mmap 리스트 element */
+
+	size_t offset; /* 읽어야 할 파일 오프셋 */
+	size_t read_bytes; /* 가상페이지에 쓰여져 있는 데이터 크기 */
+	size_t zero_bytes; /* 0으로 채울 남은 페이지의 바이트 */
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -99,7 +106,8 @@ void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
 		struct supplemental_page_table *src);
 void supplemental_page_table_kill (struct supplemental_page_table *spt);
-struct page *spt_find_page (struct supplemental_page_table *spt, void *va);
+struct page *spt_find_page (struct supplemental_page_table *spt,
+		void *va);
 bool spt_insert_page (struct supplemental_page_table *spt, struct page *page);
 void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 
@@ -114,14 +122,5 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
-
-struct vm_entry{
-	enum vm_type type;
-	struct file *file;
-	off_t read_offset; // must read start point
-	off_t read_size; // must read size
-
-
-}
 
 #endif  /* VM_VM_H */
