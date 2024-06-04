@@ -50,6 +50,9 @@ struct page {
 	/* Your implementation */
 	struct hash_elem h_elem;
 
+	/* Memory Mapped File 에서 다룰 예정 */
+	struct list_elem mmap_elem; /* mmap 리스트 element */
+
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -111,5 +114,14 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+struct vm_entry{
+	enum vm_type type;
+	struct file *file;
+	off_t read_offset; // must read start point
+	off_t read_size; // must read size
+
+
+}
 
 #endif  /* VM_VM_H */

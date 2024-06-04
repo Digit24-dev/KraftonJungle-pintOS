@@ -8,6 +8,8 @@
 #include "vm/uninit.c"
 #include "vm/file.c"
 #include "vm/anon.c"
+#include "userprog/process.c"
+
 
 /* Project 3 */
 uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
@@ -77,33 +79,39 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		/* TODO: 페이지를 생성하고 VM 유형에 따라 초기화기를 가져오고,
 		 * TODO: uninit_new를 호출하여 "uninit" 페이지 구조체를 만듭니다.
 		 * TODO: uninit_new를 호출한 후에 필드를 수정해야 합니다. */
-		upage = (struct page *)palloc_get_page(PAL_USER || PAL_ZERO);
+		// FRAME
+		uint64_t* kva = palloc_get_page(PAL_USER | PAL_ZERO);
 		
 		switch (type)
 		{
-		case 0: 
+		case VM_UNINIT: 
 			/* code VM_UNINIT */
-			uninit_initialize(upage, aux);
+			uninit_new(upage, &upage, init, type, aux, uninit_initialize(upage, kva));
 			break;
-		case 1:
+		case VM_ANON:
 			/* code ANON */
-			anon_initializer((struct page *)upage, type, ((struct page *)upage)->va); // 세번째 인자 잘 모르겠음
+			// 세번째 인자 잘 모르겠음
+			uninit_new(upage, &upage, init, type, aux, anon_initializer((struct page *)upage, type, kva));
 			break;
-		case 2:
+		case VM_FILE:
 			/* code FILE */
-			file_backed_initializer((struct page *)upage, type, ((struct page *)upage)->va); // 세번째 인자 잘 모르겠음
+			; // 세번째 인자 잘 모르겠음
+			uninit_new(upage, &upage, init, type, aux, file_backed_initializer((struct page *)upage, type, kva));
 			break;
-		case 3:
+		case VM_PAGE_CACHE:
 			/* code CACHE */
 			// Project 4에서 쓸거니까 평생볼일없음 퉤퉤
 			break;
 		}
 
 		// page_get_type(upage);
-		uninit_new(upage, &upage, init, type, aux, false);
 		/* TODO: 페이지를 spt에 삽입합니다. */
 		// 맞는지 모르겠음
-		hash_insert(&spt->hash_brown, &((struct page *) upage)->h_elem);
+		if ( spt_insert_page(spt, (struct page *)kva) ){
+			free(kva);
+			goto err;
+		}
+		// hash_insert(&spt->hash_brown, &((struct page *) upage)->h_elem);
 	}
 err:
 	return false;
@@ -195,7 +203,14 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+	page = pml4_get_page(&thread_current()->pml4, addr);
+	
 	/* TODO: Your code goes here */
+	void *aux = NULL;
+	//vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux)
+	if( !vm_alloc_page_with_initializer( page_get_type(page), page, is_writable((uint64_t *)page), lazy_load_segment, aux ) ){
+		return false;
+	}
 
 	return vm_do_claim_page (page);
 }
@@ -251,7 +266,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct supplemental_page_table *src UNUSED) {
 	/* Project 3 */
-
+	
 }
 
 /* Free the resource hold by the supplemental page table */
