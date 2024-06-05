@@ -1,6 +1,9 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-
+/* project 3 */
+#define USERPROG
+#define VM
+/* project 3 */
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -13,7 +16,6 @@
 #include "vm/vm.h"
 #endif
 
-// #define USERPROG
 #define MAX_FDT	64
 #define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
@@ -98,7 +100,7 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
-  /* customed */
+    /* customed */
 	int original_priority;				/* original priority (for donation) */
 	int64_t time_to_wakeup; 			/* time to wakeup */
 	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
@@ -120,8 +122,8 @@ struct thread {
 
 	/* Project2 - File Descriptor */
 	int nex_fd;
-	// struct file *fdt[MAX_FDT];			/* maximum size: 64 */
-	struct file **fdt;				/* File Descriptor Table Pointer */
+	// struct file *fdt[MAX_FDT];		/* maximum size: 64 */
+	struct file **fdt;					/* File Descriptor Table Pointer */
 	struct file *fp;					/* file pointer at running file */
 
 	/* Project2 - process */

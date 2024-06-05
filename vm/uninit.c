@@ -8,6 +8,13 @@
  * function.
  * */
 
+/*
+	모든 페이지는 uninit 페이지로 생성된다. 첫 번째 페이지 폴트 발생 시,
+	핸들러 체인이 uninit_initialize(page->operations.swap_in)를 호출한다.
+	uninit_initialize 함수는 페이지 객체를 초기화하여 특정 페이지 객체 (anon, file, page_cache)로 변환하고
+	vm_alloc_page_with_initializer 함수에서 전달된 초기화 콜백 함수를 호출한다.
+*/
+
 #include "vm/vm.h"
 #include "vm/uninit.h"
 
@@ -65,4 +72,6 @@ uninit_destroy (struct page *page) {
 	struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
+	struct lazy_load_info *info = (struct lazy_load_info *)(uninit->aux);
+	file_close(&info->file);
 }
