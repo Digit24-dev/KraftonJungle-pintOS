@@ -26,6 +26,18 @@
    half to the user pool.  That should be huge overkill for the
    kernel pool, but that's just fine for demonstration purposes. */
 
+/*
+	페이지 할당기.
+	페이지 크기 단위로 메모리를 할당한다. 작은 청크를 할당하는 할당기에 대해서는 malloc.h를 참조.
+
+	시스템 메모리는 커널 풀과 사용자 풀이라는 두 개의 'pool'로 나뉜다.
+	사용자 풀은 사용자(가상) 메모리 페이지를 위해 사용되며, 커널 풀은 나머지 모든 것을 위해 사용된다.
+	여기서의 아이디어는, 사용자 프로세스가 미친 듯이 스와핑을 하더라도 커널이 자신의 작업을 위해 메모리를 가져야 한다는 것.
+
+	기본적으로 시스템 RAM의 절반은 커널 풀에, 나머지 절반은 사용자 풀에 할당된다.
+	이는 커널 풀에 엄청나게 많은 메모리를 할당하는 것이지만, 시연 목적으로는 괜찮다.
+*/
+
 /* A memory pool. */
 struct pool {
 	struct lock lock;               /* Mutual exclusion. */

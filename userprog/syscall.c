@@ -49,10 +49,7 @@ syscall_init (void) {
 
 bool
 address_check (void *pointer) {
-	// printf("NULL: %p \n", (void *)NULL);
-	// printf("pointer: %p \n", pml4_get_page(thread_current()->pml4, pointer));
-	void *pp = pml4_get_page(thread_current()->pml4, pointer);
-	if (pointer == NULL || is_kernel_vaddr(pointer) || pp == NULL)
+	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
 		exit(-1);
 }
 
