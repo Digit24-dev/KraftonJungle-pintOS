@@ -42,6 +42,8 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	anon_page->is_updated = false;
 	anon_page->is_writeable = false;
 	anon_page->type = type;
+
+	return true;
 }
 
 /* Swap in the page by read contents from the swap disk. */

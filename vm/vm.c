@@ -8,7 +8,7 @@
 #include "vm/uninit.h"
 #include "vm/file.h"
 #include "vm/anon.h"
-
+#include "threads/vaddr.h"
 
 
 /* Project 3 */
@@ -81,6 +81,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: uninit_new를 호출한 후에 필드를 수정해야 합니다. */
 		// FRAME
 		struct page* new_page = palloc_get_page(PAL_USER | PAL_ZERO);
+		// struct page* new_page = malloc(sizeof(struct page));
 		
 		switch (type)
 		{
@@ -120,6 +121,16 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
 	/* Project 3 */
+	// ??????? //
+	/* 
+	struct page p;
+	struct hash_elem *e;
+
+	p.va = pg_round_down(va);
+	e = hash_find(&spt->hash_brown, &p.h_elem);
+	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
+	*/
+	
 	page = pml4_get_page(&thread_current()->pml4 ,va);
 	if (page == NULL) return page;
 
@@ -135,10 +146,8 @@ bool
 spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
-	printf("^_^_^_^_^_^_^_^_^_^!!삽입\n");
 	/* Project 3 */
-	if ( hash_find(&spt->hash_brown, &page->h_elem) == NULL ){
-		hash_insert(&spt->hash_brown, &page->h_elem);
+	if ( !hash_insert(&spt->hash_brown, &page->h_elem) ){
 		succ = true;
 	}
 	return succ;
@@ -202,12 +211,16 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 
-	page = pml4_get_page(&thread_current()->pml4, addr);
+	// page = pml4_get_page(&thread_current()->pml4, addr);
+	page = spt_find_page(spt, addr);
+	if (page == NULL) return false;
 	// page = spt_find_page(&thread_current()->spt, addr);
 	
+	bool writable = is_writable((uint64_t *)page);
+
 	/* TODO: Your code goes here */
 	void *aux = NULL;
-	if( !vm_alloc_page_with_initializer( page_get_type(page), page, is_writable((uint64_t *)page), (page, addr), aux ) ){
+	if( !vm_alloc_page_with_initializer( page_get_type(page), page, writable, page->uninit.init, page->uninit.aux ) ){
 		return false;
 	}
 
