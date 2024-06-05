@@ -122,11 +122,7 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
 	free(page);
 
-	if (e != NULL) {
-		return hash_entry(e, struct page, h_elem);
-	} else {
-		return NULL;
-	}
+	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
 }
 
 /* Insert PAGE into spt with validation. */
@@ -216,13 +212,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	struct page *page = NULL;
 
 	if (not_present) {
-		void *rsp = f->rsp;
-
-		if (!user) rsp = thread_current()->tf.rsp;
-
-		if ((USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK))
-            vm_stack_growth(addr);
-
 		page = spt_find_page(spt, addr);
 		if (page == NULL) return false;
 		if (write && !page->writable) return false;
@@ -266,12 +255,6 @@ vm_do_claim_page (struct page *page) {
     bool success = (pml4_get_page (curr->pml4, page->va) == NULL && pml4_set_page (curr->pml4, page->va, frame->kva, page->writable));
 
     return success ? swap_in(page, frame->kva) : false;
-
-	// uint64_t *pml4 = thread_current()->pml4;
-	// if (!pml4_set_page(pml4, page->va, frame->kva, page->writable))
-	// 	return false;
-
-	// return swap_in (page, frame->kva);
 }
 
 /* Initialize new supplemental page table */
@@ -284,44 +267,8 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	// scr에서 dst로 SPT을 복사하는 함수
-
-    struct hash_iterator iterator;
-    hash_first(&iterator, &src->hash_brown);
-
-    while (hash_next(&iterator)) {
-        // hash_cur: 현재 elem을 리턴하거나, table의 끝인 null 포인터를 반환하거나
-        struct page *parent_page = hash_entry(hash_cur(&iterator), struct page, h_elem);
-
-        enum vm_type type = parent_page->operations->type;
-        void *upage = parent_page->va;
-        bool writable = parent_page->writable;
-
-        // 1) type이 uninit이면
-        if (type == VM_UNINIT) {
-            vm_initializer *init = parent_page->uninit.init;
-            void *aux = parent_page->uninit.aux;
-            vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
-            continue;
-        }
-
-        // 2) type이 uninit이 아니면
-        if (!vm_alloc_page(type, upage, writable)) {
-            // init이랑 aux는 Lazy Loading에 필요함
-            // 지금 만드는 페이지는 기다리지 않고 바로 내용을 넣어줄 것이므로 필요 없음
-            return false;
-        }
-
-        // vm_claim_page으로 요청해서 매핑 & 페이지 타입에 맞게 초기화
-        if (!vm_claim_page(upage)) {
-            return false;
-        }
-
-        // 매핑된 프레임에 내용 로딩
-        struct page *dst_page = spt_find_page(dst, upage);
-        memcpy(dst_page->frame->kva, parent_page->frame->kva, PGSIZE);
-    }
-    return true;
+	
+	
 }
 
 /* Free the resource hold by the supplemental page table */

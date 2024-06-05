@@ -154,6 +154,7 @@ page_fault (struct intr_frame *f) {
 
 	/* Count page faults. */
 	page_fault_cnt++;
+	
 	exit(-1);
 
 	/* If the fault is true fault, show info and exit. */

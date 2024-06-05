@@ -408,7 +408,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* parsing file_name */
 	char *save_ptr;
 	char *argv[100];
-	strlcpy(argv, file_name, PGSIZE);
+	strlcpy(argv, file_name, strlen(file_name) + 1);
 	
 	strtok_r(file_name, " ", &save_ptr);
 
