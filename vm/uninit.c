@@ -73,5 +73,6 @@ uninit_destroy (struct page *page) {
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
 	struct lazy_load_info *info = (struct lazy_load_info *)(uninit->aux);
-	file_close(&info->file);
+	// 이게 나쁜 코드
+	// file_close(&info->file);
 }

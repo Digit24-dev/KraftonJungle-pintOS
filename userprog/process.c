@@ -778,7 +778,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 		
-		struct lazy_load_info *aux_info = malloc(sizeof(struct lazy_load_info));
+		struct lazy_load_info *aux_info = (struct lazy_load_info*  )malloc(sizeof(struct lazy_load_info));
 
 		aux_info->file = file;
 		aux_info->ofs = ofs;

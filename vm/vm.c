@@ -44,7 +44,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
-	lock_init(&frame_lock);
+	// lock_init(&frame_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -84,7 +84,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	// 주소 검증은 필요 없을까?
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
-		struct page *newpage = malloc(sizeof(struct page));
+		struct page *newpage = (struct page *)malloc(sizeof(struct page));
 		switch (VM_TYPE(type))
 		{
 		case VM_ANON:
@@ -116,12 +116,10 @@ err:
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
-	struct page page;
-	page.va = pg_round_down(va);	// va가 가리키는 가상 페이지의 시작 포인트 (오프셋이 0으로 설정된 va) 반환
+	struct page *page = (struct page *) malloc(sizeof(struct page));
+	page->va = pg_round_down(va);	// va가 가리키는 가상 페이지의 시작 포인트 (오프셋이 0으로 설정된 va) 반환
 
-	struct hash_elem *e = hash_find(&spt->hash_brown, &page.h_elem);
-
-	// free(page);
+	struct hash_elem *e = hash_find(&spt->hash_brown, &page->h_elem);
 
 	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
 }
@@ -215,7 +213,8 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	if (not_present) {
 		page = spt_find_page(spt, addr);
 		if (page == NULL) return false;
-		if (write && !page->writable) return false;
+		// if (write && !page->writable) return false;
+		if (write == 1 && page->writable == 0) return false;
 		return vm_do_claim_page(page);
 	}
 	return false;
@@ -246,7 +245,7 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
-
+	if (frame == NULL) return false;
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
@@ -269,7 +268,7 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	
-	struct hash_iterator* iterator;
+	struct hash_iterator iterator;
 	hash_first(&iterator, &src->hash_brown);
 
 	while (hash_next(&iterator))
@@ -298,7 +297,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		void *upage = temp_page->va;
 		bool writable = temp_page->writable;
 
-		if(type == VM_UNINIT){
+		if(VM_TYPE(type) == VM_UNINIT){
 			vm_initializer * init = temp_page->uninit.init;
 			void * aux = temp_page->uninit.aux;
 			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
