@@ -9,6 +9,7 @@
 #include "threads/mmu.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include <string.h>
 
 /* Project 3 */
 uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
@@ -115,12 +116,12 @@ err:
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
-	struct page *page = (struct page*)malloc(sizeof(struct page));
-	page->va = pg_round_down(va);	// va가 가리키는 가상 페이지의 시작 포인트 (오프셋이 0으로 설정된 va) 반환
+	struct page page;
+	page.va = pg_round_down(va);	// va가 가리키는 가상 페이지의 시작 포인트 (오프셋이 0으로 설정된 va) 반환
 
-	struct hash_elem *e = hash_find(&spt->hash_brown, &page->h_elem);
+	struct hash_elem *e = hash_find(&spt->hash_brown, &page.h_elem);
 
-	free(page);
+	// free(page);
 
 	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
 }
@@ -268,6 +269,55 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	
+	struct hash_iterator* iterator;
+	hash_first(&iterator, &src->hash_brown);
+
+	while (hash_next(&iterator))
+	{	
+		// 이 방식은 쓰레기다.
+		// 실제 물리 메모리가 할당 되어야 할것
+		struct hash_elem* hash_elem = hash_cur(&iterator);
+		struct page* temp_page = hash_entry(hash_elem, struct page, h_elem);
+		
+		// struct page* new_page = (struct page*) malloc( sizeof(struct page) );
+		// if(new_page == NULL) return false;
+
+		// memcpy( new_page, temp_page, sizeof( struct page ) );
+
+		// if(!vm_alloc_page(new_page->operations->type, new_page, new_page->writable)){
+		// 	free(new_page);
+		// 	return false;
+		// }
+
+		// if( !spt_insert_page( &dst->hash_brown, new_page ) ){
+		// 	free(new_page);
+		// 	return false;
+		// }
+		// 무엇이 다른가
+		enum vm_type type = temp_page->operations->type;
+		void *upage = temp_page->va;
+		bool writable = temp_page->writable;
+
+		if(type == VM_UNINIT){
+			vm_initializer * init = temp_page->uninit.init;
+			void * aux = temp_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			continue;
+		}
+
+		if(!vm_alloc_page(type, upage, writable)){
+			return false;
+		}
+
+		if(!vm_claim_page(upage)){
+			return false;
+		}
+
+		struct page *new_page = spt_find_page(dst, upage);
+		memcpy(new_page->frame->kva, temp_page->frame->kva, PGSIZE);
+	}
+	
+	return true;
 	
 }
 
@@ -277,11 +327,9 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	hash_clear(&spt->hash_brown, hash_action_func_impl);
+	// hash_destroy(&spt->hash_brown, hash_action_func_impl);
 }
 
 bool delete_page(struct hash *pages, struct page *p) {
-	if (!hash_delete(pages, &p->h_elem))
-		return true;
-	else
-		return false;
+	return !hash_delete(pages, &p->h_elem)? true : false;
 }

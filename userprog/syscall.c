@@ -50,7 +50,8 @@ syscall_init (void) {
 bool
 address_check (void *pointer) {
 	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
-		exit(-1);
+		if(!spt_find_page(&thread_current()->spt,pointer))
+			exit(-1);	
 }
 
 /* The main system call interface */
