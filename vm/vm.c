@@ -191,6 +191,15 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	struct thread * current = thread_current();
+
+	// pg_round_up( addr );
+
+	// void *stack_bottom = (void *) ( pg_round_up( current->rsp ) - PGSIZE );
+	void *stack_bottom = (void *) pg_round_up( addr );
+	// while(stack_bottom > addr){
+	vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true);
+	// stack_bottom -= PGSIZE;
 }
 
 /* Handle the fault on write_protected page */
@@ -207,16 +216,30 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	if (addr == NULL || is_kernel_vaddr(addr)) 
 		return false;
 	
+	
+	struct thread * current = thread_current();
+
+	// page fault가 난 주소가 rsp가 가리키는 주소보다 더 낮은 주소를 가리키고 있을 때 
+	// 즉 스택에 할당되지 않은 주소를 가리키며, 그 주소가 스택의 유효범위 안에 있을때 
+	// 즉 스택을 늘려서 이 주소를 스택에 포함시킬수 있을 때
+	// 0x47380000
+	// 0x47480000 ~ 0x47380000 안에 듬
+	if( addr <= USER_STACK && addr >= (USER_STACK - (1<<20)) ){
+		void *rsp_page = pg_round_up(f->rsp);
+		if( rsp_page > addr ){
+			vm_stack_growth(addr);	
+		}
+	}
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 
 	if (not_present) {
 		page = spt_find_page(spt, addr);
 		if (page == NULL) return false;
-		// if (write && !page->writable) return false;
 		if (write == 1 && page->writable == 0) return false;
 		return vm_do_claim_page(page);
 	}
+
 	return false;
 }
 
@@ -252,7 +275,8 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *curr = thread_current();
-    bool success = (pml4_get_page (curr->pml4, page->va) == NULL && pml4_set_page (curr->pml4, page->va, frame->kva, page->writable));
+    bool success = (pml4_get_page (curr->pml4, page->va) == NULL 
+		&& pml4_set_page (curr->pml4, page->va, frame->kva, page->writable));
 
     return success ? swap_in(page, frame->kva) : false;
 }
@@ -278,20 +302,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct hash_elem* hash_elem = hash_cur(&iterator);
 		struct page* temp_page = hash_entry(hash_elem, struct page, h_elem);
 		
-		// struct page* new_page = (struct page*) malloc( sizeof(struct page) );
-		// if(new_page == NULL) return false;
-
-		// memcpy( new_page, temp_page, sizeof( struct page ) );
-
-		// if(!vm_alloc_page(new_page->operations->type, new_page, new_page->writable)){
-		// 	free(new_page);
-		// 	return false;
-		// }
-
-		// if( !spt_insert_page( &dst->hash_brown, new_page ) ){
-		// 	free(new_page);
-		// 	return false;
-		// }
 		// 무엇이 다른가
 		enum vm_type type = temp_page->operations->type;
 		void *upage = temp_page->va;

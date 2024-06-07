@@ -133,6 +133,9 @@ struct thread {
 	struct semaphore sema_wait;			/* semaphore for wait */
 	struct intr_frame copied_if;		/* copied intr frame */
 
+	/* Project 3 */
+	uint64_t rsp;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
