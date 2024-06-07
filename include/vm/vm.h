@@ -121,6 +121,7 @@ struct lazy_load_info
 	size_t ofs;
 	size_t read_bytes;
 	size_t zero_bytes;
+
 	bool writable;
 };
 

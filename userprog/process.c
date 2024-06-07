@@ -388,10 +388,16 @@ struct ELF64_PHDR {
 
 static bool setup_stack (struct intr_frame *if_);
 static bool validate_segment (const struct Phdr *, struct file *);
+#ifdef VM
+static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+		uint32_t read_bytes, uint32_t zero_bytes,
+		bool writable, char * UNUSED);
+#endif
+#ifndef VM
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
-
+#endif
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
@@ -483,7 +489,7 @@ load (const char *file_name, struct intr_frame *if_) {
 						zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
 					}
 					if (!load_segment (file, file_page, (void *) mem_page,
-								read_bytes, zero_bytes, writable))
+								read_bytes, zero_bytes, writable, file_name))
 						goto done;
 				}
 				else
@@ -725,10 +731,11 @@ lazy_load_segment (struct page *page, void *aux) {
 	struct lazy_load_info *info = (struct lazy_load_info*)aux;
 
 	struct file *file = info->file;
+
 	size_t ofs = info->ofs;
 	size_t read_bytes = info->read_bytes;
 	size_t zero_bytes = info->zero_bytes;
-	
+
 	file_seek (file, ofs);
 	if (file_read (file, page->frame->kva, read_bytes) != (int) read_bytes) {
 		palloc_free_page(page->frame->kva);
@@ -764,12 +771,13 @@ FILE의 OFS 오프셋부터 시작하는 세그먼트를 UPAGE 주소에 로드�
 */
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
-		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+		uint32_t read_bytes, uint32_t zero_bytes, bool writable, char * file_name UNUSED) {
 			
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	// printf("file_name  %s\n", file_name);
 	// file_seek(file, ofs);
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
@@ -780,6 +788,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		
 		struct lazy_load_info *aux_info = (struct lazy_load_info*  )malloc(sizeof(struct lazy_load_info));
 
+		// printf("read_bytes  %d\n", read_bytes); // 읽어야 할 바이트
+		// printf("page_read_bytes  %d\n", page_read_bytes); // 읽은 바이트
+		// printf("zero_bytes  %d\n", zero_bytes); // 0으로 채워야 할 바이트
+		// printf("ofs  %d\n", ofs); 
+
+		// aux_info->file = temp_file;
 		aux_info->file = file;
 		aux_info->ofs = ofs;
 		aux_info->read_bytes = read_bytes;

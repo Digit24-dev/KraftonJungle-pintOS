@@ -299,7 +299,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
 		if(VM_TYPE(type) == VM_UNINIT){
 			vm_initializer * init = temp_page->uninit.init;
-			void * aux = temp_page->uninit.aux;
+			void * aux = malloc(sizeof( struct lazy_load_info));
+			memcpy(aux, temp_page->uninit.aux, sizeof( struct lazy_load_info));
 			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
 			continue;
 		}
