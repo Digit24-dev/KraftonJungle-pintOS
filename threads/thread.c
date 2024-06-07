@@ -152,6 +152,9 @@ thread_start (void) {
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
 
+	/* ====================== customed for advanced ======================*/
+    load_avg = 0;
+
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down (&idle_started);
 }
@@ -235,7 +238,7 @@ thread_create (const char *name, int priority,
 	t->parent_process = thread_current();
 
 	/* FDT setup */
-	t->fdt = palloc_get_multiple(PAL_ZERO, 2);
+	t->fdt = palloc_get_multiple(PAL_ZERO, 1);
 	t->nex_fd = 2;
 	for (size_t i = 2; i < MAX_FDT; i++)
 		t->fdt[i] = NULL;
@@ -334,7 +337,8 @@ thread_exit (void) {
 	
 	thread_current()->terminated = true;
 	sema_up(&thread_current()->sema_exit);
-	sema_down(&thread_current()->parent_process->sema_wait);
+	// sema_down(&thread_current()->parent_process->sema_wait);
+	sema_down(&thread_current()->sema_wait);
 
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
@@ -378,7 +382,9 @@ thread_get_priority (void) {
 	return thread_current ()->priority;
 }
 
+/* ====================== customed for advanced ======================*/
 /* Sets the current thread's nice value to NICE. */
+// thread nice 설정
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
@@ -386,6 +392,7 @@ thread_set_nice (int nice UNUSED) {
 }
 
 /* Returns the current thread's nice value. */
+// thread nice 가져오는 동작
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
@@ -393,6 +400,7 @@ thread_get_nice (void) {
 }
 
 /* Returns 100 times the system load average. */
+// load_avg 가져오는 동작 (100씩 곱해줘야 함)
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
@@ -403,6 +411,7 @@ thread_get_load_avg (void) {
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
+// thread recent_cpu 가져오는 동작 (100씩 곱해줘야 함)
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
@@ -498,7 +507,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	// 	t->fdt[i] = NULL;
 
 	/* advanced */
-	t->exit_code = -1;
+	t->exit_code = 0;
 	t->nice = 0;
 	t->recent_cpu = 0;
 

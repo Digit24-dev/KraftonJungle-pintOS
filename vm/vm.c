@@ -191,14 +191,11 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
-	struct thread * current = thread_current();
+	// struct thread * current = thread_current();
 
-	// pg_round_up( addr );
-
-	// void *stack_bottom = (void *) ( pg_round_up( current->rsp ) - PGSIZE );
-	void *stack_bottom = (void *) pg_round_up( addr );
+	// void *stack_bottom = (void *) ( pg_round_up( addr ) - PGSIZE );
 	// while(stack_bottom > addr){
-	vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true);
+	vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true);
 	// stack_bottom -= PGSIZE;
 }
 
@@ -224,11 +221,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	// 즉 스택을 늘려서 이 주소를 스택에 포함시킬수 있을 때
 	// 0x47380000
 	// 0x47480000 ~ 0x47380000 안에 듬
-	if( addr <= USER_STACK && addr >= (USER_STACK - (1<<20)) ){
-		void *rsp_page = pg_round_up(f->rsp);
-		if( rsp_page > addr ){
-			vm_stack_growth(addr);	
-		}
+	if( addr < USER_STACK && addr >= (USER_STACK - (1<<20)) + 8 
+		&& pg_round_down(current->rsp - PGSIZE) ){
+		vm_stack_growth(addr);
 	}
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
@@ -237,7 +232,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 		page = spt_find_page(spt, addr);
 		if (page == NULL) return false;
 		if (write == 1 && page->writable == 0) return false;
-		return vm_do_claim_page(page);
+		bool succ = vm_do_claim_page(page);
+		// printf("SUCC ^_^!! %d \n",succ);
+		return succ;
 	}
 
 	return false;
