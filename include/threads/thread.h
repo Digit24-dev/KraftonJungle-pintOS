@@ -1,7 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 /* project 3 */
-#define USERPROG
+// #define USERPROG
 #define VM
 /* project 3 */
 #include <debug.h>
@@ -132,6 +132,9 @@ struct thread {
 	struct semaphore sema_load;			/* semaphore for load */
 	struct semaphore sema_wait;			/* semaphore for wait */
 	struct intr_frame copied_if;		/* copied intr frame */
+
+	/* Project 3 */
+	uint64_t rsp;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

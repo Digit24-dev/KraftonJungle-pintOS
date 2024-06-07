@@ -47,10 +47,20 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
+// bool
+// address_check (void *pointer) {
+// 	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
+// 		exit(-1);
+// }
+
 bool
 address_check (void *pointer) {
-	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
-		exit(-1);
+	// NULL 포인터 | 커널 VM을 가르킴 | 매핑되지 않은 VM을 가리킴 
+	if (pointer == NULL || is_kernel_vaddr(pointer))
+		if (!spt_find_page(&thread_current()->spt, pointer))	// 해당 주소가 올바른 접근이지 확인.
+			exit(-1);
+
+	return true;
 }
 
 /* The main system call interface */
@@ -64,6 +74,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
+
+	thread_current()->rsp = f->rsp;
 
 	// check validity
 	switch (f->R.rax)
@@ -235,7 +247,9 @@ bool remove (const char *file)
 
 int open (const char *file)
 {
+	lock_acquire(&filesys_lock);
 	struct file* param = filesys_open(file);
+	lock_release(&filesys_lock);
 	if (param == NULL) return -1;
 	return thread_add_file(param);
 }
@@ -264,6 +278,7 @@ void close (int fd)
 	struct file *param = fd_to_file(fd);
 	if (param == NULL) exit(-1);
 	thread_current()->fdt[fd] = NULL;
+	thread_current()->nex_fd = fd;
 	file_close(param);
 }
 
@@ -277,9 +292,17 @@ int
 thread_add_file (struct file *f)
 {
 	struct thread *cur = thread_current();
-	int ret = cur->nex_fd;
-	cur->fdt[cur->nex_fd] = f;
-	++cur->nex_fd;
+	int ret;
+	if (cur->fdt[cur->nex_fd] == NULL) {
+		cur->fdt[cur->nex_fd] = f;
+		ret = cur->nex_fd;
+	} 
+	else
+		return -1;
+
+	while (cur->nex_fd < MAX_FDT - 1 && cur->fdt[cur->nex_fd] != NULL)
+		++cur->nex_fd;
+	
 	return ret;
 }
 
@@ -296,7 +319,7 @@ int wait (pid_t pid)
 
 int exec (const char *file)
 {
-	char *temp = palloc_get_page(0);
+	char *temp = palloc_get_page(PAL_ZERO);
 	strlcpy(temp, file, strlen(file) + 1);
 	sema_down(&thread_current()->sema_load);
 	return process_exec(temp);

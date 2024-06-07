@@ -9,6 +9,7 @@
 #include "threads/mmu.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include <string.h>
 
 /* Project 3 */
 uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
@@ -43,7 +44,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
-	lock_init(&frame_lock);
+	// lock_init(&frame_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -83,7 +84,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	// 주소 검증은 필요 없을까?
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
-		struct page *newpage = malloc(sizeof(struct page));
+		struct page *newpage = (struct page *)malloc(sizeof(struct page));
 		switch (VM_TYPE(type))
 		{
 		case VM_ANON:
@@ -115,12 +116,10 @@ err:
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
-	struct page *page = (struct page*)malloc(sizeof(struct page));
+	struct page *page = (struct page *) malloc(sizeof(struct page));
 	page->va = pg_round_down(va);	// va가 가리키는 가상 페이지의 시작 포인트 (오프셋이 0으로 설정된 va) 반환
 
 	struct hash_elem *e = hash_find(&spt->hash_brown, &page->h_elem);
-
-	free(page);
 
 	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
 }
@@ -192,6 +191,12 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	// struct thread * current = thread_current();
+
+	// void *stack_bottom = (void *) ( pg_round_up( addr ) - PGSIZE );
+	// while(stack_bottom > addr){
+	vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true);
+	// stack_bottom -= PGSIZE;
 }
 
 /* Handle the fault on write_protected page */
@@ -208,15 +213,30 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	if (addr == NULL || is_kernel_vaddr(addr)) 
 		return false;
 	
+	
+	struct thread * current = thread_current();
+
+	// page fault가 난 주소가 rsp가 가리키는 주소보다 더 낮은 주소를 가리키고 있을 때 
+	// 즉 스택에 할당되지 않은 주소를 가리키며, 그 주소가 스택의 유효범위 안에 있을때 
+	// 즉 스택을 늘려서 이 주소를 스택에 포함시킬수 있을 때
+	// 0x47380000
+	// 0x47480000 ~ 0x47380000 안에 듬
+	if( addr < USER_STACK && addr >= (USER_STACK - (1<<20)) + 8 
+		&& pg_round_down(current->rsp - PGSIZE) ){
+		vm_stack_growth(addr);
+	}
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 
 	if (not_present) {
 		page = spt_find_page(spt, addr);
 		if (page == NULL) return false;
-		if (write && !page->writable) return false;
-		return vm_do_claim_page(page);
+		if (write == 1 && page->writable == 0) return false;
+		bool succ = vm_do_claim_page(page);
+		// printf("SUCC ^_^!! %d \n",succ);
+		return succ;
 	}
+
 	return false;
 }
 
@@ -245,14 +265,15 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
-
+	if (frame == NULL) return false;
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *curr = thread_current();
-    bool success = (pml4_get_page (curr->pml4, page->va) == NULL && pml4_set_page (curr->pml4, page->va, frame->kva, page->writable));
+    bool success = (pml4_get_page (curr->pml4, page->va) == NULL 
+		&& pml4_set_page (curr->pml4, page->va, frame->kva, page->writable));
 
     return success ? swap_in(page, frame->kva) : false;
 }
@@ -268,6 +289,42 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	
+	struct hash_iterator iterator;
+	hash_first(&iterator, &src->hash_brown);
+
+	while (hash_next(&iterator))
+	{	
+		// 이 방식은 쓰레기다.
+		// 실제 물리 메모리가 할당 되어야 할것
+		struct hash_elem* hash_elem = hash_cur(&iterator);
+		struct page* temp_page = hash_entry(hash_elem, struct page, h_elem);
+		
+		// 무엇이 다른가
+		enum vm_type type = temp_page->operations->type;
+		void *upage = temp_page->va;
+		bool writable = temp_page->writable;
+
+		if(VM_TYPE(type) == VM_UNINIT){
+			vm_initializer * init = temp_page->uninit.init;
+			void * aux = malloc(sizeof( struct lazy_load_info));
+			memcpy(aux, temp_page->uninit.aux, sizeof( struct lazy_load_info));
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			continue;
+		}
+
+		if(!vm_alloc_page(type, upage, writable)){
+			return false;
+		}
+
+		if(!vm_claim_page(upage)){
+			return false;
+		}
+
+		struct page *new_page = spt_find_page(dst, upage);
+		memcpy(new_page->frame->kva, temp_page->frame->kva, PGSIZE);
+	}
+	
+	return true;
 	
 }
 
@@ -277,11 +334,9 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	hash_clear(&spt->hash_brown, hash_action_func_impl);
+	// hash_destroy(&spt->hash_brown, hash_action_func_impl);
 }
 
 bool delete_page(struct hash *pages, struct page *p) {
-	if (!hash_delete(pages, &p->h_elem))
-		return true;
-	else
-		return false;
+	return !hash_delete(pages, &p->h_elem)? true : false;
 }
