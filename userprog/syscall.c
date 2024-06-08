@@ -343,7 +343,6 @@ int exec (const char *file)
 
 /* Project 3 */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	address_check(addr);
 	// file descriptor is not valid
 	if( fd == STDIN_FILENO || fd == STDOUT_FILENO ) return NULL;
 	struct file *file = fd_to_file(fd);
@@ -356,7 +355,7 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	// is pre_allocated
 	if( spt_find_page(&thread_current()->spt, addr) != NULL) return NULL;
 	// is addr 0 or length is 0
-	if(addr == NULL || length == 0) return NULL;
+	if(addr == NULL || is_kernel_vaddr(addr) || length == 0) return NULL;
 
 	return do_mmap(addr, length, writable, file, offset);
 }
