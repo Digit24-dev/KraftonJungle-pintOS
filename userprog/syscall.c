@@ -57,8 +57,8 @@ bool
 address_check (void *pointer) {
 	// NULL 포인터 | 커널 VM을 가르킴 | 매핑되지 않은 VM을 가리킴 
 	if (pointer == NULL || is_kernel_vaddr(pointer))
-		if (!spt_find_page(&thread_current()->spt, pointer))	// 해당 주소가 올바른 접근이지 확인.
-			exit(-1);
+		exit(-1);
+		// if (!spt_find_page(&thread_current()->spt, pointer))	// 해당 주소가 올바른 접근이지 확인.
 
 	return true;
 }

@@ -134,7 +134,7 @@ struct thread {
 	struct intr_frame copied_if;		/* copied intr frame */
 
 	/* Project3 - stack growth */
-	uint64_t pf_rsp;					/* rsp buf for page fault handler */
+	uint64_t rsp;					/* rsp buf for page fault handler */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
