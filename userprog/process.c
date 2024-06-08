@@ -18,10 +18,10 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+// #define VM
 #ifdef VM
 #include "vm/vm.h"
 #endif
-
 #define MAX_ARGS 25
 
 static void process_cleanup (void);
@@ -192,9 +192,9 @@ __do_fork (void *aux) {
 	current->nex_fd = parent->nex_fd;
 	/* copy file descriptor table */
 
+	sema_up(&current->sema_load);
 	process_init ();
 	if_.R.rax = 0;
-	sema_up(&current->sema_load);
 
 	/* Finally, switch to the newly created process. */
 	if (succ) {
@@ -228,13 +228,15 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (f_name, &_if);
 
-	sema_up(&thread_current()->sema_load);
+	// sema_up(&thread_current()->sema_load);
 
 	/* If load failed, quit. */
 	palloc_free_page (f_name);
 	if (!success)
 		return -1;
 	
+	if (lock_held_by_current_thread(&filesys_lock))
+		lock_release(&filesys_lock);
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -279,7 +281,7 @@ process_wait (tid_t child_tid UNUSED) {
 	
 	list_remove(&child_thread->child_elem);
 
-	sema_up(&child_thread->parent_process->sema_wait);
+	sema_up(&child_thread->sema_wait);
 	
 	if (child_thread->terminated)
 		return child_thread->exit_code;
@@ -295,10 +297,10 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	// for (size_t i = 2; i < MAX_FDT; i++) {
-	// 	if (curr->fdt[i] != NULL) 
-	// 		file_close(curr->fdt[i]);
-	// }
+	for (size_t i = 2; i < MAX_FDT; i++) {
+		if (curr->fdt[i] != NULL) 
+			file_close(curr->fdt[i]);
+	}
 	
 	palloc_free_multiple(curr->fdt, 1);
 	file_close(curr->fp);
@@ -417,9 +419,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* parsing file_name */
 	char *save_ptr;
-	char *argv = palloc_get_page(0);
-	strlcpy(argv, file_name, PGSIZE);
+	char *argv[50];
 	
+	strlcpy(argv, file_name, strlen(file_name) + 1);
 	strtok_r(file_name, " ", &save_ptr);
 
 	/* Allocate and activate page directory. */
@@ -429,11 +431,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
-	lock_acquire(&filesys_lock);
 	file = filesys_open (file_name);
 	if (file == NULL) {
-		// lock_release(&filesys_lock);
-		palloc_free_page(argv);
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
@@ -503,7 +502,7 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-	lock_release(&filesys_lock);
+	
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -561,9 +560,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	// <--- argument passing ---> //
 	file_deny_write(file);
-
 	success = true;
-	palloc_free_page(argv);
 done:
 	/* We arrive here whether the load is successful or not. */
 	// file_close (file);
@@ -725,6 +722,34 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	/* 파일로부터 세그먼트를 로드한다.
+		주소 VA 에서 첫 번째 페이지 폴트 발생 시 이 함수가 호출된다.
+		이 함수를 호출할 때 VA(가상 주소)를 사용할 수 있다. */
+	struct lazy_load_info *info = (struct lazy_load_info*)aux;
+	struct file *file = info->file;
+
+	size_t ofs = info->ofs;
+	size_t read_bytes = info->read_bytes;
+	size_t zero_bytes = info->zero_bytes;
+	
+	file_seek (file, ofs);
+
+	/* Do calculate how to fill this page.
+	 * We will read PAGE_READ_BYTES bytes from FILE
+	 * and zero the final PAGE_ZERO_BYTES bytes. */
+	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+	size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+	if (page->frame->kva == NULL)
+		return false;
+
+	if (file_read (file, page->frame->kva, read_bytes) != (int) read_bytes) {
+		// palloc_free_page(page->frame->kva);
+		return false;
+	}
+	memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+	
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -754,17 +779,34 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+		
+		struct lazy_load_info *aux_info = malloc(sizeof(struct lazy_load_info));
+		if (aux_info == NULL)
+			return false;
+
+		aux_info->file = file;
+		aux_info->ofs = ofs;
+		aux_info->read_bytes = read_bytes;
+		aux_info->zero_bytes = zero_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux_info)) {
+			free(aux_info);
 			return false;
+		}
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		/*
+			파일에서 데이터를 읽어올 때 파일 오프셋을 적절히 이동시키기 위해서이다.
+			load_segment 함수는 파일의 특정 오프셋부터 시작하여 세그먼트를 로드한다. 
+			이때 세그먼트의 크기가 페이지 크기보다 클 경우, 여러 페이지에 걸쳐서 세그먼트를 로드해야 한다.
+			각 반복마다 page_read_bytes 만큼의 데이터를 파일에서 읽어와 페이지에 로드하고,
+			이 때 파일 오프셋 ofs를 page_read_bytes 만큼 증가시켜야 다음 페이지를 로드할 때 파일의 올바른 위치에서 데이터를 읽어올 수 있다.
+		*/
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -778,7 +820,13 @@ setup_stack (struct intr_frame *if_) {
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
-	/* TODO: Your code goes here */
+	/* stack_bottom에 스택을 매핑하고 페이지를 즉시 요청 */
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true)) {
+		success = vm_claim_page(stack_bottom);
+		
+		if (success)
+			if_->rsp = USER_STACK;
+	}
 
 	return success;
 }

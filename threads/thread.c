@@ -330,16 +330,15 @@ thread_exit (void) {
 #ifdef USERPROG
 	process_exit ();
 #endif
+	thread_current()->terminated = true;
+	sema_up(&thread_current()->sema_exit);
+	sema_down(&thread_current()->sema_wait);
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
 	list_remove(&thread_current()->adv_elem);
 	
-	thread_current()->terminated = true;
-	sema_up(&thread_current()->sema_exit);
-	sema_down(&thread_current()->parent_process->sema_wait);
-
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -736,7 +735,6 @@ thread_wakeup(int64_t tick) {
 }
 
 static bool
-
 time_to_wakeup_less (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
 {

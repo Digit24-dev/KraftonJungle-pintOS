@@ -1,6 +1,7 @@
 #ifndef VM_VM_H
 #define VM_VM_H
 #include <stdbool.h>
+#include <hash.h>
 #include "threads/palloc.h"
 
 enum vm_type {
@@ -27,6 +28,7 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+#include <hash.h>
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -46,6 +48,8 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	struct hash_elem h_elem;
+	bool writable;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -63,6 +67,7 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem f_elem;
 };
 
 /* The function table for page operations.
@@ -85,6 +90,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct hash hash_brown;
 };
 
 #include "threads/thread.h"
@@ -108,5 +114,19 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+/* Project 3 */
+struct lazy_load_info
+{
+	struct file *file;
+	size_t ofs;
+	size_t read_bytes;
+	size_t zero_bytes;
+};
+
+struct list frame_table;
+struct lock frame_lock;
+#include "threads/vaddr.h"
+#define MAX_STACK_BOTTOM		USER_STACK - 0x100000	// 1MB
 
 #endif  /* VM_VM_H */

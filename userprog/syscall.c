@@ -47,23 +47,33 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
+// bool
+// address_check (void *pointer) {
+// 	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
+// 		exit(-1);
+// }
+
 bool
 address_check (void *pointer) {
-	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
-		exit(-1);
+	// NULL 포인터 | 커널 VM을 가르킴 | 매핑되지 않은 VM을 가리킴 
+	if (pointer == NULL || is_kernel_vaddr(pointer))
+		if (!spt_find_page(&thread_current()->spt, pointer))	// 해당 주소가 올바른 접근이지 확인.
+			exit(-1);
+
+	return true;
 }
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	// printf ("system call!\n");
 	uint64_t arg1 = f->R.rdi;
 	uint64_t arg2 = f->R.rsi;
 	uint64_t arg3 = f->R.rdx;
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
+	thread_current()->pf_rsp = f->rsp;
 
 	// check validity
 	switch (f->R.rax)
@@ -235,7 +245,9 @@ bool remove (const char *file)
 
 int open (const char *file)
 {
+	lock_acquire(&filesys_lock);
 	struct file* param = filesys_open(file);
+	lock_release(&filesys_lock);
 	if (param == NULL) return -1;
 	return thread_add_file(param);
 }
@@ -286,7 +298,7 @@ thread_add_file (struct file *f)
 	else
 		return -1;
 
-	while (cur->nex_fd < MAX_FDT && cur->fdt[cur->nex_fd] != NULL)
+	while (cur->nex_fd < MAX_FDT - 1 && cur->fdt[cur->nex_fd] != NULL)
 		++cur->nex_fd;
 	
 	return ret;
@@ -307,6 +319,11 @@ int exec (const char *file)
 {
 	char *temp = palloc_get_page(PAL_ZERO);
 	strlcpy(temp, file, strlen(file) + 1);
-	sema_down(&thread_current()->sema_load);
-	return process_exec(temp);
+	// sema_down(&thread_current()->sema_load);
+	if (!lock_held_by_current_thread(&filesys_lock))
+		lock_acquire(&filesys_lock);
+	if (process_exec(temp) == -1)
+		exit(-1);
+	lock_release(&filesys_lock);
+	return -1;
 }
