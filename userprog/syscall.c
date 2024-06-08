@@ -73,8 +73,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
-	thread_current()->pf_rsp = f->rsp;
-
 	thread_current()->rsp = f->rsp;
 
 	// check validity

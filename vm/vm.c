@@ -224,7 +224,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = spt_find_page(spt, pg_round_down(addr));
-	uint64_t rsp = thread_current()->pf_rsp;
+	uint64_t rsp = thread_current()->rsp;
 
 	if (page == NULL) {
 		if (pg_round_down(addr) >= MAX_STACK_BOTTOM && addr < USER_STACK && addr >= rsp - 8) {
@@ -300,8 +300,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
         // 1) type이 uninit이면
         if (VM_TYPE(type) == VM_UNINIT) {
-            if (!vm_alloc_page_with_initializer (page_get_type(src_page), src_page->va, src_page->writable,
-				 src_page->uninit.init, src_page->uninit.aux)) {
+			struct lazy_load_info * temp_info = malloc( sizeof(struct lazy_load_info) );
+			memcpy ( temp_info , ((struct lazy_load_info*) src_page->uninit.aux), sizeof(struct lazy_load_info));
+			
+			if (!vm_alloc_page_with_initializer (page_get_type(src_page), src_page->va, src_page->writable,
+				 src_page->uninit.init, (void *)temp_info)) {
 					return false;
 			}
         }
