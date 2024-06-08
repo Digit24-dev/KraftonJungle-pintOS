@@ -157,6 +157,9 @@ thread_start (void) {
 	/* ====================== customed for advanced ======================*/
 	load_avg = 0;
 
+	/* ====================== customed for advanced ======================*/
+    load_avg = 0;
+
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down (&idle_started);
 }
@@ -382,7 +385,6 @@ thread_get_priority (void) {
 }
 
 /* ====================== customed for advanced ======================*/
-
 /* Sets the current thread's nice value to NICE. */
 // thread nice 설정
 void
@@ -700,7 +702,6 @@ thread_sleep(int64_t tick) {
 	enum intr_level old_level;
 
   ASSERT (!intr_context ());
-
 	if (cur != idle_thread) {
 		cur->time_to_wakeup = tick;
 		old_level = intr_disable();

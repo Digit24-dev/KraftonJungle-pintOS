@@ -57,8 +57,10 @@ process_create_initd (const char *file_name) {
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
-	if (tid == TID_ERROR)
+
+	if (tid == TID_ERROR){
 		palloc_free_page (fn_copy);
+	}
 	return tid;
 }
 
@@ -204,7 +206,8 @@ error:
 	sema_up(&current->sema_load);
 	thread_current()->exit_code = TID_ERROR;
 	thread_exit ();
-	// exit(-1);
+
+	// exit(TID_ERROR);
 }
 
 /* Switch the current execution context to the f_name.
@@ -224,7 +227,6 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup ();
-
 	/* And then load the binary */
 	success = load (f_name, &_if);
 
@@ -238,6 +240,7 @@ process_exec (void *f_name) {
 	if (lock_held_by_current_thread(&filesys_lock))
 		lock_release(&filesys_lock);
 	/* Start switched process. */
+
 	do_iret (&_if);
 	NOT_REACHED ();
 }
@@ -282,7 +285,7 @@ process_wait (tid_t child_tid UNUSED) {
 	list_remove(&child_thread->child_elem);
 
 	sema_up(&child_thread->sema_wait);
-	
+
 	if (child_thread->terminated)
 		return child_thread->exit_code;
 
@@ -303,7 +306,9 @@ process_exit (void) {
 	}
 	
 	palloc_free_multiple(curr->fdt, 1);
+
 	file_close(curr->fp);
+	// supplemental_page_table_kill(&curr->spt);
 	process_cleanup ();
 }
 
@@ -400,10 +405,10 @@ struct ELF64_PHDR {
 
 static bool setup_stack (struct intr_frame *if_);
 static bool validate_segment (const struct Phdr *, struct file *);
+
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
-
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
@@ -430,6 +435,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+	lock_acquire(&filesys_lock);
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
@@ -502,7 +508,7 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-	
+
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -561,10 +567,10 @@ load (const char *file_name, struct intr_frame *if_) {
 	// <--- argument passing ---> //
 	file_deny_write(file);
 	success = true;
+
 done:
 	/* We arrive here whether the load is successful or not. */
 	// file_close (file);
-
 	return success;
 }
 
@@ -703,6 +709,13 @@ setup_stack (struct intr_frame *if_) {
  * with palloc_get_page().
  * Returns true on success, false if UPAGE is already mapped or
  * if memory allocation fails. */
+/*
+* 	사용자 가상 주소 UPAGE를 커널 가상 주소 KPAGE에 페이지 테이블 매핑한다. 
+*	Writable이 true 일 경우 사용자 프로세스는 페이지를 수정할 수 있다.
+*	*UPAGE는 이미 매핑되어 있어서는 안된다.* KPAGE는 palloc_get_page()를 사용하여
+*	사용자 풀에서 얻은 페이지어야 한다.
+*	성공시 true를 반환, UPAGE가 매핑되어 있거나 메모리 할당에 실패하면 false를 반환한다.
+*/
 static bool
 install_page (void *upage, void *kpage, bool writable) {
 	struct thread *t = thread_current ();
@@ -726,6 +739,7 @@ lazy_load_segment (struct page *page, void *aux) {
 		주소 VA 에서 첫 번째 페이지 폴트 발생 시 이 함수가 호출된다.
 		이 함수를 호출할 때 VA(가상 주소)를 사용할 수 있다. */
 	struct lazy_load_info *info = (struct lazy_load_info*)aux;
+
 	struct file *file = info->file;
 
 	size_t ofs = info->ofs;
@@ -766,13 +780,25 @@ lazy_load_segment (struct page *page, void *aux) {
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
+/*
+FILE의 OFS 오프셋부터 시작하는 세그먼트를 UPAGE 주소에 로드한다.
+총 READ_BYTES + ZERO_BYTES 바이트의 가상 메모리가 다음과 같이 초기화된다:
+- UPAGE 주소에서 READ_BYTES 바이트는 FILE의 OFS 오프셋부터 읽혀야 한다.
+- UPAGE + READ_BYTES 주소에서 ZERO_BYTES 바이트는 0으로 초기화되어야 한다.
+이 함수에 의해 초기화된 페이지들은 WRITABLE이 true이면 사용자 프로세스에 의해
+쓰기 가능해야 하고, 그렇지 않으면 읽기 전용이어야 한다.
+성공하면 true를 반환하고, 메모리 할당 오류나 디스크 읽기 오류가 발생하면 false를 반환한다.
+*/
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+			
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	// printf("file_name  %s\n", file_name);
+	// file_seek(file, ofs);
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -788,6 +814,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		aux_info->ofs = ofs;
 		aux_info->read_bytes = read_bytes;
 		aux_info->zero_bytes = zero_bytes;
+
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux_info)) {
@@ -806,6 +833,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 			각 반복마다 page_read_bytes 만큼의 데이터를 파일에서 읽어와 페이지에 로드하고,
 			이 때 파일 오프셋 ofs를 page_read_bytes 만큼 증가시켜야 다음 페이지를 로드할 때 파일의 올바른 위치에서 데이터를 읽어올 수 있다.
 		*/
+
 		ofs += page_read_bytes;
 	}
 	return true;

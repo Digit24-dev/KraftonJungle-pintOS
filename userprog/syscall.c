@@ -75,6 +75,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg6 = f->R.r9;
 	thread_current()->pf_rsp = f->rsp;
 
+	thread_current()->rsp = f->rsp;
+
 	// check validity
 	switch (f->R.rax)
 	{
@@ -326,4 +328,5 @@ int exec (const char *file)
 		exit(-1);
 	lock_release(&filesys_lock);
 	return -1;
+
 }

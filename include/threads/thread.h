@@ -16,6 +16,7 @@
 
 // #define USERPROG
 #define MAX_FDT	128
+
 #define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
 enum thread_status {

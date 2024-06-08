@@ -117,6 +117,12 @@ kill (struct intr_frame *f) {
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
+
+/*
+	페이지 폴트 핸들러.
+	진입 시점에서 폴트가 발생한 주소는 CR2 (제어 레지스터 2)에 있고,
+	exception.h의 PF_* 매크로에 설명된 대로 포맷된 폴트 정보는 F의 error_code 멤버에 있다.
+*/
 static void
 page_fault (struct intr_frame *f) {
 	bool not_present;  /* True: not-present page, false: writing r/o page. */
@@ -134,7 +140,6 @@ page_fault (struct intr_frame *f) {
 	/* Turn interrupts back on (they were only off so that we could
 	   be assured of reading CR2 before it changed). */
 	intr_enable ();
-
 
 	/* Determine cause. */
 	not_present = (f->error_code & PF_P) == 0;
