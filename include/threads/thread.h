@@ -1,9 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-/* project 3 */
+// #define VM
 // #define USERPROG
-#define VM
-/* project 3 */
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -16,7 +14,9 @@
 #include "vm/vm.h"
 #endif
 
-#define MAX_FDT	64
+// #define USERPROG
+#define MAX_FDT	128
+
 #define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -100,7 +100,7 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
-    /* customed */
+  /* customed */
 	int original_priority;				/* original priority (for donation) */
 	int64_t time_to_wakeup; 			/* time to wakeup */
 	struct lock *wait_on_lock;			/* wait on lock that points the lock which a thread holds. */
@@ -122,8 +122,8 @@ struct thread {
 
 	/* Project2 - File Descriptor */
 	int nex_fd;
-	// struct file *fdt[MAX_FDT];		/* maximum size: 64 */
-	struct file **fdt;					/* File Descriptor Table Pointer */
+	// struct file *fdt[MAX_FDT];			/* maximum size: 64 */
+	struct file **fdt;				/* File Descriptor Table Pointer */
 	struct file *fp;					/* file pointer at running file */
 
 	/* Project2 - process */
@@ -133,8 +133,8 @@ struct thread {
 	struct semaphore sema_wait;			/* semaphore for wait */
 	struct intr_frame copied_if;		/* copied intr frame */
 
-	/* Project 3 */
-	uint64_t rsp;
+	/* Project3 - stack growth */
+	uint64_t pf_rsp;					/* rsp buf for page fault handler */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

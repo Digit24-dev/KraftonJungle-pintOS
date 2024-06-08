@@ -67,13 +67,13 @@ address_check (void *pointer) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	// printf ("system call!\n");
 	uint64_t arg1 = f->R.rdi;
 	uint64_t arg2 = f->R.rsi;
 	uint64_t arg3 = f->R.rdx;
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
+	thread_current()->pf_rsp = f->rsp;
 
 	thread_current()->rsp = f->rsp;
 
@@ -321,6 +321,12 @@ int exec (const char *file)
 {
 	char *temp = palloc_get_page(PAL_ZERO);
 	strlcpy(temp, file, strlen(file) + 1);
-	sema_down(&thread_current()->sema_load);
-	return process_exec(temp);
+	// sema_down(&thread_current()->sema_load);
+	if (!lock_held_by_current_thread(&filesys_lock))
+		lock_acquire(&filesys_lock);
+	if (process_exec(temp) == -1)
+		exit(-1);
+	lock_release(&filesys_lock);
+	return -1;
+
 }
