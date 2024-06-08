@@ -12,6 +12,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/fp-ops.h"
+// #include "threads/fixed_point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -124,10 +125,11 @@ thread_init (void) {
 
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
-	list_init (&ready_list);
+	list_init (&ready_list); 
 	list_init (&destruction_req);
 	/* customed */
 	list_init (&sleep_list);
+
 	/* advanced */
 	list_init (&all_thread_list);
 
@@ -151,6 +153,9 @@ thread_start (void) {
 	thread_create("idle", PRI_DEFAULT, idle, &idle_started);
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
+	
+	/* ====================== customed for advanced ======================*/
+	load_avg = 0;
 
 	/* ====================== customed for advanced ======================*/
     load_avg = 0;
@@ -164,7 +169,6 @@ thread_start (void) {
 void
 thread_tick (void) {
 	struct thread *t = thread_current ();
-
 	/* Update statistics. */
 	if (t == idle_thread)
 		idle_ticks++;
@@ -329,17 +333,15 @@ thread_exit (void) {
 #ifdef USERPROG
 	process_exit ();
 #endif
+	thread_current()->terminated = true;
+	sema_up(&thread_current()->sema_exit);
+	sema_down(&thread_current()->sema_wait);
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
 	list_remove(&thread_current()->adv_elem);
 	
-	thread_current()->terminated = true;
-	sema_up(&thread_current()->sema_exit);
-	// sema_down(&thread_current()->parent_process->sema_wait);
-	sema_down(&thread_current()->sema_wait);
-
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -409,6 +411,7 @@ thread_get_load_avg (void) {
 	intr_set_level(old_level);
 	return ret;
 }
+
 
 /* Returns 100 times the current thread's recent_cpu value. */
 // thread recent_cpu 가져오는 동작 (100씩 곱해줘야 함)
@@ -697,9 +700,8 @@ void
 thread_sleep(int64_t tick) {
 	struct thread* cur = thread_current();
 	enum intr_level old_level;
-	
-	ASSERT (!intr_context ());
 
+  ASSERT (!intr_context ());
 	if (cur != idle_thread) {
 		cur->time_to_wakeup = tick;
 		old_level = intr_disable();
