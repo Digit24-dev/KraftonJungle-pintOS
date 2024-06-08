@@ -134,7 +134,6 @@ do_mmap (void *addr, size_t length, int writable,
 }
 
 
-
 /* Do the munmap */
 void
 do_munmap (void *addr) {
