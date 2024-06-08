@@ -51,13 +51,15 @@ file_backed_destroy (struct page *page) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-		return ;
 
-	if(file_length ( file ) == 0) exit(-1);
+	if(file_length ( file ) == 0)
+		return NULL;
 
 	off_t read_byte = 0;
-	read_byte = file_read_at(file, addr, length ,offset);
-	if(read_byte != length) printf("다름!\n");
+	read_byte = file_read_at(file, addr, length, offset);
+	if(read_byte != length) {
+		
+	}
 
 	// 읽어야 할 길이가 PGSIZE의 배수가 아닌 경우
 	// stick out 조치

@@ -150,7 +150,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		
 		case SYS_MMAP:
-			// mmap((void*) arg1,(size_t)arg2, (int)arg3,(int)arg4,(off_t)arg5);
+			mmap((void*) arg1,(size_t)arg2, (int)arg3,(int)arg4,(off_t)arg5);
 			break;
 		
 		case SYS_MUNMAP:
@@ -344,9 +344,15 @@ int exec (const char *file)
 /* Project 3 */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	address_check(addr);
+	if (length == 0) return NULL;
+	if (fd == STDIN_FILENO || fd == STDOUT_FILENO) return NULL;
+	if (spt_find_page(&thread_current()->spt, addr) != NULL) return NULL;
+	
 	struct file *file = fd_to_file(fd);
-	if (file == NULL) exit(-1);
-	do_mmap(addr, length, writable, file, offset);
+	if (file == NULL)
+		return NULL;
+	
+	return do_mmap(addr, length, writable, file, offset);
 }
 void munmap (void *addr){
 	address_check(addr);
