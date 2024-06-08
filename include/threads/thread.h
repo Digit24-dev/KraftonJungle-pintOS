@@ -1,7 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 // #define VM
-// #define USERPROG
+/* project 3 */
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -134,7 +134,7 @@ struct thread {
 	struct intr_frame copied_if;		/* copied intr frame */
 
 	/* Project3 - stack growth */
-	uint64_t pf_rsp;					/* rsp buf for page fault handler */
+	uint64_t rsp;					/* rsp buf for page fault handler */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
