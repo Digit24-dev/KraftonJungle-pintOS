@@ -361,5 +361,11 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 }
 void munmap (void *addr){
 	address_check(addr);
+	// 아직 매핑 해제되지 않은 동일한 프로세서의 mmap에 대한 이전 호출에서 반환된 가상 주소
+	// 인 경우에만 해제할수 있음
+	if(spt_find_page(&thread_current()->spt, addr) == NULL ) return;
+
+	
+
 	do_munmap(addr);
 }

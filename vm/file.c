@@ -2,6 +2,8 @@
 
 #include "vm/vm.h"
 #include "string.h"
+#include "filesys/filesys.h"
+#include "threads/mmu.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -45,7 +47,30 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	
+	char *temp;
+	file_read_at( file_reopen(file_page->file), temp, file_page->read_bytes, file_page->offset );
+	struct thread *t = thread_current();
+
+	// if( page->file.writalbe ){
+	// 	lock_acquire(&filesys_lock);
+	if (pml4_is_dirty(t->pml4, page->va)) {
+		// file_write_at(file_page->file, temp, file_page->read_bytes, file_page->offset );
+		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->offset);
+		pml4_set_dirty(t->pml4, page->va, false);
+	}
+	// 	lock_release(&filesys_lock);
+	// }
+
+	file_close( page->file.file );
+
+
 }
+// static void
+// file_backed_destroy (struct page *page) {
+// 	struct file_page *file_page UNUSED = &page->file;
+
+// }
 
 static bool
 lazy_load_segment_by_file (struct page *page, void *aux) {
@@ -137,5 +162,12 @@ do_mmap (void *addr, size_t length, int writable,
 /* Do the munmap */
 void
 do_munmap (void *addr) {
-
+	// 삭제하고 뭐시기 해주는건 file_backed_destroy 에서 한다.
+	// file_backed_initializer는 file_backed_destroy 해줄때 필요한거 있으면 세팅해준다
+	// vm_file_init 
+	struct thread *current = thread_current();
+	struct page* page;
+	// 아래의 주소가 할당된 모든 페이지를 지운다.
+	while ( (page = spt_find_page(&current->spt, addr)) != NULL)
+		spt_remove_page(&current->spt, page);
 }
