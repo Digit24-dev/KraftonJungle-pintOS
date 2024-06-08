@@ -129,6 +129,7 @@ sema_up (struct semaphore *sema) {
 	intr_set_level (old_level);
 }
 
+
 static void sema_test_helper (void *sema_);
 
 /* Self-test for semaphores that makes control "ping-pong"
@@ -218,6 +219,7 @@ lock_acquire (struct lock *lock) {
 	/* customed */
 	lock->holder = thread_current ();
 }
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
@@ -320,6 +322,14 @@ cond_init (struct condition *cond) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
+bool
+sema_elem_func(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED){
+	const struct thread *a = list_entry(a_, struct semaphore_elem, elem)->holder;
+	const struct thread *b = list_entry(b_, struct semaphore_elem, elem)->holder;
+
+	return a->priority > b->priority;
+}
 
 void
 cond_wait (struct condition *cond, struct lock *lock) {
