@@ -76,7 +76,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// uint64_t arg4 = f->R.rcx;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
-	
+
 	thread_current()->rsp = f->rsp;
 
 	// check validity
@@ -150,11 +150,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		
 		case SYS_MMAP:
-			// mmap((void*) arg1,(size_t)arg2, (int)arg3,(int)arg4,(off_t)arg5);
+			f->R.rax = mmap((void*) arg1,(size_t)arg2, (int)arg3,(int)arg4,(off_t)arg5);
 			break;
 		
 		case SYS_MUNMAP:
-			// munmap((void*)arg1);
+			munmap((void*)arg1);
 			break;
 
 		default:
@@ -344,9 +344,21 @@ int exec (const char *file)
 /* Project 3 */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	address_check(addr);
+	// file descriptor is not valid
+	if( fd == STDIN_FILENO || fd == STDOUT_FILENO ) return NULL;
 	struct file *file = fd_to_file(fd);
-	if (file == NULL) exit(-1);
-	do_mmap(addr, length, writable, file, offset);
+	// file is 없음
+	if(file == NULL) return NULL;
+	// 파일의 길이가 0인 경우
+	if(file_length ( file ) == 0) return NULL;
+	// addr is not page-aligned
+	if( pg_round_down(addr) != addr ) return NULL;
+	// is pre_allocated
+	if( spt_find_page(&thread_current()->spt, addr) != NULL) return NULL;
+	// is addr 0 or length is 0
+	if(addr == NULL || length == 0) return NULL;
+
+	return do_mmap(addr, length, writable, file, offset);
 }
 void munmap (void *addr){
 	address_check(addr);
