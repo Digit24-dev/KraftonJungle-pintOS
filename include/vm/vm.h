@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <hash.h>
 #include "threads/palloc.h"
+#include <hash.h>
 
 enum vm_type {
 	/* page not initialized */
@@ -115,6 +116,7 @@ void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 
+
 /* Project 3 */
 struct lazy_load_info
 {
@@ -127,6 +129,6 @@ struct lazy_load_info
 struct list frame_table;
 struct lock frame_lock;
 #include "threads/vaddr.h"
-#define MAX_STACK_BOTTOM		USER_STACK - 0x100000	// 1MB
-
+#define MAX_STACK_BOTTOM	USER_STACK - 0x100000	// 1MB
+// #define MAX_STACK_BOTTOM	USER_STACK - (1<<20)	// 1MB
 #endif  /* VM_VM_H */
