@@ -137,9 +137,9 @@ page_fault (struct intr_frame *f) {
 
 
 	/* Determine cause. */
-	not_present = (f->error_code & PF_P) == 0;
-	write = (f->error_code & PF_W) != 0;
-	user = (f->error_code & PF_U) != 0;
+	not_present = (f->error_code & PF_P) == 0;		/* addr에 매핑된 physical frame이 존재하지 않는 경우 */
+	write = (f->error_code & PF_W) != 0;			/* true: write 작업 시도 / false: read 작업 시도 */
+	user = (f->error_code & PF_U) != 0;				/* true: user에 의한 접근 / false: kernel에 의한 접근 */
 
 #ifdef VM
 	/* For project 3 and later. */

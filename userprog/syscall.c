@@ -14,7 +14,7 @@
 #include <string.h>
 
 #include "userprog/process.h"
-// #include "string.h"
+#include "vm/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -57,8 +57,9 @@ bool
 address_check (void *pointer) {
 	// NULL 포인터 | 커널 VM을 가르킴 | 매핑되지 않은 VM을 가리킴 
 	if (pointer == NULL || is_kernel_vaddr(pointer))
-		if (!spt_find_page(&thread_current()->spt, pointer))	// 해당 주소가 올바른 접근이지 확인.
 			exit(-1);
+		/* 스택 growth는 thread에서 stack 프레임이 모자라 발생하는 페이지 폴트임. 이게 있으면 address_check 할 시에 막히게 됨. */
+		// if (!spt_find_page(&thread_current()->spt, pointer))	// 해당 주소가 올바른 접근이지 확인.
 
 	return true;
 }
@@ -73,7 +74,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg4 = f->R.r10;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
-	thread_current()->pf_rsp = f->rsp;
+	thread_current()->rsp = f->rsp;
 
 	// check validity
 	switch (f->R.rax)
@@ -143,6 +144,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		case SYS_CLOSE:
 			close((int)arg1);
+			break;
+
+		case SYS_MMAP:
+			address_check(arg1);
+			f->R.rax = mmap(arg1, arg2, arg3, arg4, arg5);
+			break;
+
+		case SYS_MUNMAP:
+			address_check(arg1);
+			munmap(arg1);
 			break;
 
 		default:
@@ -326,4 +337,16 @@ int exec (const char *file)
 		exit(-1);
 	lock_release(&filesys_lock);
 	return -1;
+}
+
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset)
+{
+	struct file* file = fd_to_file(fd);
+	if (length == 0) return NULL;
+	do_mmap(addr, length, writable, file, offset);
+}
+
+void munmap (void *addr)
+{
+	
 }

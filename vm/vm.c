@@ -206,20 +206,26 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	
 	if (!not_present && write)
 		return false;
-	
+
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = spt_find_page(spt, pg_round_down(addr));
-	uint64_t rsp = thread_current()->pf_rsp;
+	uint64_t rsp = user ? f->rsp : thread_current()->rsp;
+
+#ifdef DEBUG
+printf("PF status / addr: %ld, rsp: %ld frsp: %ld, user: %d, write: %d, not_present: %d \n"
+		, (addr), rsp, f->rsp, user, write, not_present);
+#endif
 
 	if (page == NULL) {
 		if (pg_round_down(addr) >= MAX_STACK_BOTTOM && addr < USER_STACK && addr >= rsp - 8) {
-			vm_stack_growth(pg_round_down(addr));
+			vm_stack_growth((pg_round_down(addr)));
 			return true;
 		}
-		else 
+		else
 			return false;
 	}
-	
+
+done:
 	return vm_do_claim_page(page);
 }
 
