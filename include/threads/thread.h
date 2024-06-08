@@ -2,7 +2,7 @@
 #define THREADS_THREAD_H
 /* project 3 */
 // #define USERPROG
-#define VM
+// #define VM
 /* project 3 */
 #include <debug.h>
 #include <list.h>
