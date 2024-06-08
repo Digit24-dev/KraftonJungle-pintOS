@@ -224,7 +224,13 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 	
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = spt_find_page(spt, pg_round_down(addr));
-	uint64_t rsp = thread_current()->rsp;
+	uint64_t rsp;
+	// 유저 모드일 경우 Intr_frame의 rsp를 가리켜야 한다.
+	if(user){
+		rsp = f->rsp;
+	} else {
+		rsp = thread_current()->rsp;
+	}
 
 	if (page == NULL) {
 		if (pg_round_down(addr) >= MAX_STACK_BOTTOM && addr < USER_STACK && addr >= rsp - 8) {
@@ -268,7 +274,7 @@ vm_do_claim_page (struct page *page) {
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
-
+	
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *curr = thread_current();
     bool success = pml4_set_page (curr->pml4, page->va, frame->kva, page->writable);
