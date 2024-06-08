@@ -1,6 +1,7 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "string.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -50,9 +51,27 @@ file_backed_destroy (struct page *page) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
+		return ;
+
+	if(file_length ( file ) == 0) exit(-1);
+
+	off_t read_byte = 0;
+	read_byte = file_read_at(file, addr, length ,offset);
+	if(read_byte != length) printf("다름!\n");
+
+	// 읽어야 할 길이가 PGSIZE의 배수가 아닌 경우
+	// stick out 조치
+	if(length%PGSIZE > 0)
+		memset(addr+length, 0, length%PGSIZE);
+
+	if(writable){
+		// write back?
+	}
+
 }
 
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+
 }

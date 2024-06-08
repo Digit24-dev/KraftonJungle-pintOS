@@ -129,5 +129,6 @@ struct lazy_load_info
 struct list frame_table;
 struct lock frame_lock;
 #include "threads/vaddr.h"
-#define MAX_STACK_BOTTOM		USER_STACK - 0x100000	// 1MB
+#define MAX_STACK_BOTTOM	USER_STACK - 0x100000	// 1MB
+// #define MAX_STACK_BOTTOM	USER_STACK - (1<<20)	// 1MB
 #endif  /* VM_VM_H */
