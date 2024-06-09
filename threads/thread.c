@@ -157,9 +157,6 @@ thread_start (void) {
 	/* ====================== customed for advanced ======================*/
 	load_avg = 0;
 
-	/* ====================== customed for advanced ======================*/
-    load_avg = 0;
-
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down (&idle_started);
 }

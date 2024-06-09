@@ -13,6 +13,7 @@ struct file_page {
 	size_t zero_bytes; // 0으로 채울 바이트
 	/* is writable */
 	bool writalbe;
+	bool has_next;
 };
 
 void vm_file_init (void);
