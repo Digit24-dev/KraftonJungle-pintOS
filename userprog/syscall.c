@@ -349,17 +349,18 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	// file is 없음
 	if(file == NULL) return NULL;
 	// 파일의 길이가 0인 경우
-	if(file_length ( file ) == 0) return NULL;
+	if(file_length (file) == 0) return NULL;
 	// addr is not page-aligned
 	if( pg_round_down(addr) != addr ) return NULL;
 	// is pre_allocated
-	if( spt_find_page(&thread_current()->spt, addr) != NULL) return NULL;
+	if( spt_find_page(&thread_current()->spt, pg_round_down(addr)) != NULL) return NULL;
 	// is addr 0 or length is 0
 	if(addr == NULL || is_kernel_vaddr(addr) || length == 0) return NULL;
 
 	return do_mmap(addr, length, writable, file, offset);
 }
 void munmap (void *addr){
-	address_check(addr);
+	if(addr == NULL || is_kernel_vaddr(addr)) exit(-1);
+	// if(spt_find_page(&thread_current()->spt, addr) == NULL) exit(-1);
 	do_munmap(addr);
 }
