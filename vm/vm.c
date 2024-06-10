@@ -7,7 +7,6 @@
 #include "threads/vaddr.h"
 #include "string.h"
 
-
 /* Project 3 */
 uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
     // elem의 필드를 사용하여 해시 값을 계산하여 반환
@@ -192,7 +191,6 @@ vm_get_frame (void) {
 	// lock_release(&frame_lock);
     frame->page = NULL;
 
-
     return frame;
 }
 
@@ -213,9 +211,9 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
-printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %ld, rsp: %ld, f-rsp: %ld \n", user, write, not_present, addr, thread_current()->rsp, f->rsp);
+printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %lld, rsp: %lld, f-rsp: %lld \n", user, write, not_present, addr, thread_current()->rsp, f->rsp);
 #endif
 	/* TODO: Validate the fault */
 	if (addr == NULL || is_kernel_vaddr(addr)) 
@@ -229,7 +227,7 @@ printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %ld, rsp: %ld, f-rsp: %ld \n", 
 
 	if (not_present) {
 		if (page == NULL) {
-			if (pg_round_down(addr) >= MAX_STACK_BOTTOM && addr < USER_STACK && addr >= rsp - 8) {
+			if (pg_round_down(addr) >= (void*)MAX_STACK_BOTTOM && addr < (void*)USER_STACK && addr >= (void*)(rsp - 8)) {
 #ifdef DEBUG
 printf("stack growth! \n");
 #endif
