@@ -257,12 +257,20 @@ int read (int fd, void *buffer, unsigned length)
 
 bool create (const char *file, unsigned initial_size)
 {
-	return filesys_create(file, initial_size);
+	bool success;
+	lock_acquire(&filesys_lock);
+	success = filesys_create(file, initial_size);
+	lock_release(&filesys_lock);
+	return success;
 }
 
 bool remove (const char *file)
 {
-	return filesys_remove(file);
+	bool success;
+	lock_acquire(&filesys_lock);
+	success = filesys_remove(file);
+	lock_release(&filesys_lock);
+	return success;
 }
 
 int open (const char *file)
@@ -272,7 +280,6 @@ int open (const char *file)
 	lock_release(&filesys_lock);
 	if (param == NULL) return -1;
 	int fd = thread_add_file(param);
-	
 	return fd; 
 }
 
@@ -303,7 +310,9 @@ void close (int fd)
 		exit(-1);
 	thread_current()->fdt[fd] = NULL;
 	thread_current()->nex_fd = fd;
+	lock_acquire(&filesys_lock);
 	file_close(param);
+	lock_release(&filesys_lock);
 }
 
 /* fd -> struct file* */

@@ -29,9 +29,9 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 
 	struct file_page *file_page = &page->file;
 	
-	struct file_page *info = (struct file_page*)page->uninit.aux;
+	struct lazy_load_info *info = (struct lazy_load_info*)page->uninit.aux;
 	file_page->file = info->file;
-	file_page->offset = info->offset;
+	file_page->offset = info->ofs;
 	file_page->read_bytes = info->read_bytes;
 	file_page->zero_bytes = info->zero_bytes;
 	return true;
