@@ -127,7 +127,7 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->has_next = temp_length > PGSIZE;
 
 
-		if( !vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment_by_file, aux) ){	
+		if( !vm_alloc_page_with_initializer(VM_FILE, current_addr, writable, lazy_load_segment_by_file, aux) ){	
 			file_close(reopened_file);
 			free(aux);
 			return NULL;
