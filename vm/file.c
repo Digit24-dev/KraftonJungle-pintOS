@@ -113,7 +113,6 @@ do_mmap (void *addr, size_t length, int writable,
 	// if(offset % PGSIZE != 0) return NULL;
 	void * current_addr = addr;
 	file_seek(reopened_file, offset);
-	void * current_addr = addr;
 
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
