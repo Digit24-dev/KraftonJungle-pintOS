@@ -224,9 +224,9 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup ();
-
 	/* And then load the binary */
 	success = load (f_name, &_if);
+
 
 	// sema_up(&thread_current()->sema_load);
 
