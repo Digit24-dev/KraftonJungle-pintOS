@@ -59,13 +59,7 @@ file_backed_destroy (struct page *page) {
 		pml4_set_dirty(t->pml4, page->va, false);
 	}
 	pml4_clear_page(t->pml4, page->va);
-  file_close( page->file.file );
 }
-// static void
-// file_backed_destroy (struct page *page) {
-// 	struct file_page *file_page UNUSED = &page->file;
-
-// }
 
 static bool
 lazy_load_segment_by_file (struct page *page, void *aux) {
@@ -112,6 +106,8 @@ do_mmap (void *addr, size_t length, int writable,
 	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
 	// if(offset % PGSIZE != 0) return NULL;
 
+	void * current_addr = addr;
+
 	file_seek(file, offset);
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
@@ -124,13 +120,13 @@ do_mmap (void *addr, size_t length, int writable,
 		if (aux == NULL)
 			return NULL;
 		
-		aux->file = file;
+		aux->file = f;
 		aux->offset = offset;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;
 		aux->has_next = temp_length > PGSIZE;
 
-		if( !vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment_by_file, aux) ){	
+		if( !vm_alloc_page_with_initializer(VM_FILE, current_addr, writable, lazy_load_segment_by_file, aux) ){	
 			free(aux);
 			return NULL;
 		}
@@ -138,7 +134,7 @@ do_mmap (void *addr, size_t length, int writable,
 		/* Advance. */
 		temp_length -= page_read_bytes;
 		temp_zero_length -= page_zero_bytes;
-		addr += PGSIZE;
+		current_addr += PGSIZE;
 		/*
 			파일에서 데이터를 읽어올 때 파일 오프셋을 적절히 이동시키기 위해서이다.
 			load_segment 함수는 파일의 특정 오프셋부터 시작하여 세그먼트를 로드한다. 

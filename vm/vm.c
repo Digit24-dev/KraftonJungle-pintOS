@@ -213,7 +213,7 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %ld, rsp: %ld, f-rsp: %ld \n", user, write, not_present, addr, thread_current()->rsp, f->rsp);
 #endif
