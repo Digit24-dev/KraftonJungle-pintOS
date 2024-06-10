@@ -213,7 +213,7 @@ int read (int fd, void *buffer, unsigned length)
 {
 	int str_cnt = 0;
 	const char *p = buffer;
-	void *fp = NULL;
+	struct file *fp = NULL;
 	char c;
 
 	if (fd >= MAX_FDT || fd < 0) return -1;
@@ -234,19 +234,18 @@ int read (int fd, void *buffer, unsigned length)
 		/* need to set errno to EBADF */
 		str_cnt = -1;
 		break;
-	default:
-		{
+	default: {
 			/* project 3 jihun : 
-			   프로젝트 3부턴 file_read함수 호출전에
-			   그 파일의 권한을 확인해줘야하는 작업이 필요 */
+				프로젝트 3부턴 file_read함수 호출전에
+				그 파일의 권한을 확인해줘야하는 작업이 필요 */
 			struct page *page = spt_find_page(&thread_current()->spt, buffer);
 			if(page != NULL && !page->writable)
 				exit(-1);
-
+				
 			fp = fd_to_file(fd);
 			if (fp == NULL) exit(-1);
 			lock_acquire(&filesys_lock);
-			str_cnt = file_read((struct file *)fp, buffer, length);
+			str_cnt = file_read(fp, buffer, length);
 			lock_release(&filesys_lock);
 		}
 		break;

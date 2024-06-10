@@ -74,9 +74,8 @@ uninit_destroy (struct page *page) {
 	 * TODO: If you don't have anything to do, just return. */
 	struct lazy_load_info *info = (struct lazy_load_info *)(uninit->aux);
 	// 이제 나쁜 코드 아님
-	if( VM_TYPE(uninit->type) == VM_FILE )
-		file_close(&info->file);
-
+	// if( VM_TYPE(uninit->type) == VM_FILE )
+	// 	file_close(&info->file);
 
 	free( info );
 }
