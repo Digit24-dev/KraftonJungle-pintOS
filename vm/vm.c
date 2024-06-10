@@ -224,7 +224,6 @@ printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %lld, rsp: %lld, f-rsp: %lld \n
 	uint64_t rsp = user ? f->rsp : thread_current()->rsp;
 	// 유저 모드일 경우 Intr_frame의 rsp를 가리켜야 한다.
 
-
 	if (not_present) {
 		if (page == NULL) {
 			if (pg_round_down(addr) >= (void*)MAX_STACK_BOTTOM && addr < (void*)USER_STACK && addr >= (void*)(rsp - 8)) {
@@ -306,16 +305,33 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
         void *upage = src_page->va;
         bool writable = src_page->writable;
 
-        // 1) type이 uninit이면
+        // 
         if (VM_TYPE(type) == VM_UNINIT) {
 			struct lazy_load_info * temp_info = malloc( sizeof(struct lazy_load_info) );
 			memcpy ( temp_info , ((struct lazy_load_info*) src_page->uninit.aux), sizeof(struct lazy_load_info));
 			
-			if (!vm_alloc_page_with_initializer (page_get_type(src_page), src_page->va, src_page->writable,
+			if (!vm_alloc_page_with_initializer (page_get_type(src_page), upage, src_page->writable,
 				 src_page->uninit.init, (void *)temp_info)) {
 					return false;
 			}
         }
+		// 
+		else if (VM_TYPE(type) == VM_FILE) {
+			struct lazy_load_info *info = malloc(sizeof(struct lazy_load_info));
+			info->file = src_page->file.file;
+			info->ofs = src_page->file.offset;
+			info->read_bytes = src_page->file.read_bytes;
+			info->zero_bytes = src_page->file.zero_bytes;
+
+			if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, info))
+				return false;
+				
+			struct page *dst_file_page = spt_find_page(dst, upage);
+			file_backed_initializer(dst_file_page, type, NULL);
+			dst_file_page->frame = src_page->frame;
+			pml4_set_page(thread_current()->pml4, dst_file_page->va, src_page->frame->kva, src_page->writable);
+			continue;
+		}
 		else {
 			if (!vm_alloc_page(page_get_type(src_page), src_page->va, src_page->writable)) 
 				return false;
