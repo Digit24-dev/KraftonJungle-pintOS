@@ -215,7 +215,7 @@ int read (int fd, void *buffer, unsigned length)
 {
 	int str_cnt = 0;
 	const char *p = buffer;
-	struct file *fp = NULL;
+	void *fp = NULL;
 	char c;
 
 	if (fd >= MAX_FDT || fd < 0) return -1;
@@ -237,11 +237,20 @@ int read (int fd, void *buffer, unsigned length)
 		str_cnt = -1;
 		break;
 	default:
-		fp = fd_to_file(fd);
-		if (fp == NULL) exit(-1);
-		lock_acquire(&filesys_lock);
-		str_cnt = file_read(fp, buffer, length);
-		lock_release(&filesys_lock);
+		{
+			/* project 3 jihun : 
+			   프로젝트 3부턴 file_read함수 호출전에
+			   그 파일의 권한을 확인해줘야하는 작업이 필요 */
+			struct page *page = spt_find_page(&thread_current()->spt, buffer);
+			if(page != NULL && !page->writable)
+				exit(-1);
+
+			fp = fd_to_file(fd);
+			if (fp == NULL) exit(-1);
+			lock_acquire(&filesys_lock);
+			str_cnt = file_read((struct file *)fp, buffer, length);
+			lock_release(&filesys_lock);
+		}
 		break;
 	}
 	return str_cnt;
@@ -352,14 +361,14 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	// is addr 0 or length is 0
 	if(addr == NULL || is_kernel_vaddr(addr) || is_kernel_vaddr(addr + length)) return NULL;
 	// file descriptor is not valid
-	if( fd == STDIN_FILENO || fd == STDOUT_FILENO ) return NULL;
+	if( fd == STDIN_FILENO || fd == STDOUT_FILENO || is_kernel_vaddr(addr + length)) return NULL;
 	struct file *file = fd_to_file(fd);
 	// file is 없음
 	if( file == NULL ) return NULL;
 	// 파일의 길이가 0인 경우
 	if( file_length (file) == 0 || length <= 0 ) return NULL;
 	// addr is not page-aligned
-	if( pg_round_down(addr) != addr ) return NULL;
+	if( pg_round_down(addr) != addr || length <= 0) return NULL;
 	// is pre_allocated
 	if( spt_find_page(&thread_current()->spt, pg_round_down(addr)) != NULL) return NULL;
 	

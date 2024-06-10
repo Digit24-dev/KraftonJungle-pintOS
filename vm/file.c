@@ -76,8 +76,8 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	size_t page_zero_bytes = info->zero_bytes;
 	
 	file_seek (file, offset); 
-	
-	if (page->frame->kva == NULL)
+
+	if(page->frame->kva == NULL)
 		return false;
 
 	/* Do calculate how to fill this page.
@@ -108,6 +108,7 @@ do_mmap (void *addr, size_t length, int writable,
 	// if(offset % PGSIZE != 0) return NULL;
 	void * current_addr = addr;
 	file_seek(reopened_file, offset);
+
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -125,7 +126,9 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->zero_bytes = page_zero_bytes;
 		aux->has_next = temp_length > PGSIZE;
 
-		if( !vm_alloc_page_with_initializer(VM_FILE, current_addr, writable, lazy_load_segment_by_file, aux) ){	
+
+		if( !vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment_by_file, aux) ){	
+			file_close(reopened_file);
 			free(aux);
 			return NULL;
 		}
@@ -133,8 +136,10 @@ do_mmap (void *addr, size_t length, int writable,
 		/* Advance. */
 		temp_length -= page_read_bytes;
 		temp_zero_length -= page_zero_bytes;
+
 		current_addr += PGSIZE;
 		offset += page_read_bytes;
+
 	}
 
 	return addr;
