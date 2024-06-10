@@ -113,29 +113,29 @@ tests/vm/mmap-off_PUTFILES = tests/vm/large.txt
 tests/vm/mmap-bad-off_PUTFILES = tests/vm/large.txt
 tests/vm/mmap-kernel_PUTFILES = tests/vm/sample.txt
 
-tests/vm/page-linear.output: TIMEOUT = 300
-tests/vm/page-shuffle.output: TIMEOUT = 600
+tests/vm/page-linear.output: TIMEOUT = 30
+tests/vm/page-shuffle.output: TIMEOUT = 60
 tests/vm/page-shuffle.output: MEMORY = 20
-tests/vm/mmap-shuffle.output: TIMEOUT = 600
+tests/vm/mmap-shuffle.output: TIMEOUT = 60
 tests/vm/mmap-shuffle.output: MEMORY = 20
-tests/vm/page-merge-seq.output: TIMEOUT = 600
+tests/vm/page-merge-seq.output: TIMEOUT = 60
 tests/vm/page-merge-par.output: SWAP_DISK = 10
-tests/vm/page-merge-par.output: TIMEOUT = 600
+tests/vm/page-merge-par.output: TIMEOUT = 60
 tests/vm/page-merge-stk.output: SWAP_DISK = 10
 tests/vm/page-merge-mm.output: SWAP_DISK = 10
-tests/vm/lazy-file.output: TIMEOUT = 600
+tests/vm/lazy-file.output: TIMEOUT = 60
 tests/vm/swap-anon.output: SWAP_DISK = 30
-tests/vm/swap-anon.output: TIMEOUT = 180
+tests/vm/swap-anon.output: TIMEOUT = 18
 tests/vm/swap-anon.output: MEMORY = 10
 tests/vm/swap-file.output: SWAP_DISK = 10
-tests/vm/swap-file.output: TIMEOUT = 180
+tests/vm/swap-file.output: TIMEOUT = 18
 tests/vm/swap-file.output: MEMORY = 8
 tests/vm/swap-iter.output: SWAP_DISK = 50
-tests/vm/swap-iter.output: TIMEOUT = 180
+tests/vm/swap-iter.output: TIMEOUT = 18
 tests/vm/swap-iter.output: MEMORY = 10
 tests/vm/swap-fork.output: SWAP_DISK = 200
 tests/vm/swap-fork.output: MEMORY = 40
-tests/vm/swap-fork.output: TIMEOUT = 600
+tests/vm/swap-fork.output: TIMEOUT = 60
 
 
 tests/vm/zeros:
