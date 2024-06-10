@@ -124,7 +124,6 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
 	free(page);
 
-
 	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
 }
 
@@ -214,32 +213,36 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-
+#define DEBUG
+#ifdef DEBUG
+printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %ld, rsp: %ld, f-rsp: %ld \n", user, write, not_present, addr, thread_current()->rsp, f->rsp);
+#endif
 	/* TODO: Validate the fault */
 	if (addr == NULL || is_kernel_vaddr(addr)) 
-		return false;
-	
-	if (!not_present && write)
 		return false;
 
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = spt_find_page(spt, pg_round_down(addr));
-	uint64_t rsp;
+	uint64_t rsp = user ? f->rsp : thread_current()->rsp;
 	// 유저 모드일 경우 Intr_frame의 rsp를 가리켜야 한다.
-	if(user){
-		rsp = f->rsp;
-	} else {
-		rsp = thread_current()->rsp;
+
+
+	if (not_present) {
+		if (page == NULL) {
+			if (pg_round_down(addr) >= MAX_STACK_BOTTOM && addr < USER_STACK && addr >= rsp - 8) {
+#ifdef DEBUG
+printf("stack growth! \n");
+#endif
+				vm_stack_growth((pg_round_down(addr)));
+				return addr != NULL ? true : false;
+			}
+			else
+				return false;
+		}
 	}
 
-	if (page == NULL) {
-		if (pg_round_down(addr) >= MAX_STACK_BOTTOM && addr < USER_STACK && addr >= rsp - 8) {
-			vm_stack_growth((pg_round_down(addr)));
-			return true;
-		}
-		else
-			return false;
-	}
+	if (write && !page->writable)
+		return false;
 
 done:
 	return vm_do_claim_page(page);
@@ -337,7 +340,6 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	hash_clear(&spt->hash_brown, hash_action_func_impl);
-
 }
 
 bool delete_page(struct hash *pages, struct page *p) {

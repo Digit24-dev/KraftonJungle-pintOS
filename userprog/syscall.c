@@ -349,23 +349,18 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	// file is 없음
 	if(file == NULL) return NULL;
 	// 파일의 길이가 0인 경우
-	if(file_length ( file ) == 0) return NULL;
+	if(file_length (file) == 0) return NULL;
 	// addr is not page-aligned
 	if( pg_round_down(addr) != addr ) return NULL;
 	// is pre_allocated
-	if( spt_find_page(&thread_current()->spt, addr) != NULL) return NULL;
+	if( spt_find_page(&thread_current()->spt, pg_round_down(addr)) != NULL) return NULL;
 	// is addr 0 or length is 0
 	if(addr == NULL || is_kernel_vaddr(addr) || length == 0) return NULL;
 
 	return do_mmap(addr, length, writable, file, offset);
 }
 void munmap (void *addr){
-	address_check(addr);
-	// 아직 매핑 해제되지 않은 동일한 프로세서의 mmap에 대한 이전 호출에서 반환된 가상 주소
-	// 인 경우에만 해제할수 있음
-	if(spt_find_page(&thread_current()->spt, addr) == NULL ) return;
-
-	
-
+	if(addr == NULL || is_kernel_vaddr(addr)) exit(-1);
+	// if(spt_find_page(&thread_current()->spt, addr) == NULL) exit(-1);
 	do_munmap(addr);
 }

@@ -2,7 +2,6 @@
 
 #include "vm/vm.h"
 #include "string.h"
-#include "filesys/filesys.h"
 #include "threads/mmu.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
@@ -29,6 +28,12 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
+	
+	struct file_page *info = (struct file_page*)page->uninit.aux;
+	file_page->file = info->file;
+	file_page->offset = info->offset;
+	file_page->read_bytes = info->read_bytes;
+	file_page->zero_bytes = info->zero_bytes;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -47,24 +52,14 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-	
-	char *temp;
-	file_read_at( file_reopen(file_page->file), temp, file_page->read_bytes, file_page->offset );
 	struct thread *t = thread_current();
 
-	// if( page->file.writalbe ){
-	// 	lock_acquire(&filesys_lock);
 	if (pml4_is_dirty(t->pml4, page->va)) {
-		// file_write_at(file_page->file, temp, file_page->read_bytes, file_page->offset );
 		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->offset);
 		pml4_set_dirty(t->pml4, page->va, false);
 	}
-	// 	lock_release(&filesys_lock);
-	// }
-
-	file_close( page->file.file );
-
-
+	pml4_clear_page(t->pml4, page->va);
+  file_close( page->file.file );
 }
 // static void
 // file_backed_destroy (struct page *page) {
@@ -74,37 +69,34 @@ file_backed_destroy (struct page *page) {
 
 static bool
 lazy_load_segment_by_file (struct page *page, void *aux) {
-	/* 파일로부터 세그먼트를 로드한다.
-		주소 VA 에서 첫 번째 페이지 폴트 발생 시 이 함수가 호출된다.
-		이 함수를 호출할 때 VA(가상 주소)를 사용할 수 있다. */
-	struct file_page *info = (struct file_page*)aux;
+	
+	// if (page->frame->kva == NULL)
+	// 	return false;
 
+	struct file_page *info = (struct file_page*)aux;
 	struct file *file = info->file;
 	
 	size_t offset = info->offset;
-	size_t read_bytes = info->read_bytes;
-	size_t zero_bytes = info->zero_bytes;
+	size_t page_read_bytes = info->read_bytes;
+	size_t page_zero_bytes = info->zero_bytes;
 	
 	// read_at으로 하니 필요 없을 듯
-	// file_seek (file, offset); 
+	file_seek (file, offset); 
 
 	/* Do calculate how to fill this page.
 	 * We will read PAGE_READ_BYTES bytes from FILE
 	 * and zero the final PAGE_ZERO_BYTES bytes. */
-	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-	size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-	if (page->frame->kva == NULL)
+	if (file_read(file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
 		return false;
-
-	off_t read_byte = 0;
-	read_byte = file_read_at(file, page->va, page_read_bytes ,offset);
-	if(read_byte != page_read_bytes) return false;
+	}
+	// off_t read_byte = 0;
+	// read_byte = file_read_at(file, page->frame->kva, page_read_bytes, offset);
+	// if(read_byte != page_read_bytes) 
+	// 	return false;
 
 	// 읽어야 할 길이가 PGSIZE의 배수가 아닌 경우
 	// stick out 조치
-	if(read_byte%PGSIZE > 0)
-		memset(page->va+read_byte, 0, read_byte%PGSIZE);
+	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
 	return true;
 }
@@ -114,17 +106,18 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	
-	size_t temp_length = length < PGSIZE ? length : PGSIZE;
-	size_t temp_zero_length = PGSIZE - temp_length;
+	struct file *f = file_reopen(file);
+	size_t temp_length = length < file_length(f) ? length : file_length(f);
+	size_t temp_zero_length = PGSIZE - temp_length % PGSIZE;
+	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
+	// if(offset % PGSIZE != 0) return NULL;
 
-	if((temp_length + temp_zero_length) % PGSIZE == 0);
-	if(offset % PGSIZE == 0);
-	
+	file_seek(file, offset);
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
-		size_t page_read_bytes = page_read_bytes < PGSIZE ? page_read_bytes : PGSIZE;
+		size_t page_read_bytes = temp_length < PGSIZE ? temp_length : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 		
 		struct file_page *aux = malloc(sizeof(struct file_page));
@@ -135,7 +128,7 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->offset = offset;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;
-		aux->writalbe = writable;
+		aux->has_next = temp_length > PGSIZE;
 
 		if( !vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment_by_file, aux) ){	
 			free(aux);
@@ -162,12 +155,16 @@ do_mmap (void *addr, size_t length, int writable,
 /* Do the munmap */
 void
 do_munmap (void *addr) {
-	// 삭제하고 뭐시기 해주는건 file_backed_destroy 에서 한다.
-	// file_backed_initializer는 file_backed_destroy 해줄때 필요한거 있으면 세팅해준다
-	// vm_file_init 
-	struct thread *current = thread_current();
-	struct page* page;
-	// 아래의 주소가 할당된 모든 페이지를 지운다.
-	while ( (page = spt_find_page(&current->spt, addr)) != NULL)
-		spt_remove_page(&current->spt, page);
+	struct thread *t = thread_current();
+	struct page *page = spt_find_page(&t->spt, addr);
+	
+	if (!page)
+		return;
+	
+	bool has_next;
+	do {
+		has_next = page->file.has_next;
+		spt_remove_page(&t->spt, page);
+		addr += PGSIZE;
+	} while (has_next && (page = spt_find_page(&t->spt, addr)));
 }
