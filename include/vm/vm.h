@@ -116,6 +116,9 @@ void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 
+uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux);
+bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_, void *aux);
+void hash_action_func_impl (struct hash_elem *e, void *aux);
 
 /* Project 3 */
 struct lazy_load_info
