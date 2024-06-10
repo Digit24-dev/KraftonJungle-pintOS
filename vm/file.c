@@ -29,9 +29,9 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 
 	struct file_page *file_page = &page->file;
 	
-	struct file_page *info = (struct file_page*)page->uninit.aux;
+	struct lazy_load_info *info = (struct lazy_load_info*)page->uninit.aux;
 	file_page->file = info->file;
-	file_page->offset = info->offset;
+	file_page->offset = info->ofs;
 	file_page->read_bytes = info->read_bytes;
 	file_page->zero_bytes = info->zero_bytes;
 	return true;
@@ -92,6 +92,8 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	// 	return false;
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
+	pml4_set_dirty(&thread_current()->pml4, page->va, 0);
+
 	return true;
 }
 
@@ -99,10 +101,13 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-	
+
 	struct file *reopened_file = file_reopen(file);
+	if (file_length(reopened_file) - offset <= 0) 
+		return NULL;
+
 	size_t temp_length = length < file_length(reopened_file) ? length : file_length(reopened_file);
-	size_t temp_zero_length = PGSIZE - temp_length % PGSIZE;
+	size_t temp_zero_length = PGSIZE - (temp_length % PGSIZE);
 	
 	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
 	// if(offset % PGSIZE != 0) return NULL;
@@ -144,7 +149,6 @@ do_mmap (void *addr, size_t length, int writable,
 
 	return addr;
 }
-
 
 /* Do the munmap */
 void
