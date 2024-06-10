@@ -277,6 +277,7 @@ int open (const char *file)
 {
 	lock_acquire(&filesys_lock);
 	struct file* param = filesys_open(file);
+	lock_release(&filesys_lock);
 	if (param == NULL) return -1;
 	int fd = thread_add_file(param);
 	return fd; 
