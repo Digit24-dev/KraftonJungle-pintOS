@@ -92,6 +92,8 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	// 	return false;
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
+	pml4_set_dirty(&thread_current()->pml4, page->va, 0);
+
 	return true;
 }
 
@@ -99,10 +101,13 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-	
+
 	struct file *reopened_file = file_reopen(file);
+	if (file_length(reopened_file) - offset <= 0) 
+		return NULL;
+
 	size_t temp_length = length < file_length(reopened_file) ? length : file_length(reopened_file);
-	size_t temp_zero_length = PGSIZE - temp_length % PGSIZE;
+	size_t temp_zero_length = PGSIZE - (temp_length % PGSIZE);
 	
 	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
 	// if(offset % PGSIZE != 0) return NULL;
@@ -144,7 +149,6 @@ do_mmap (void *addr, size_t length, int writable,
 
 	return addr;
 }
-
 
 /* Do the munmap */
 void
