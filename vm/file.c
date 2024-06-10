@@ -92,6 +92,8 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	// 	return false;
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
+	pml4_set_dirty(&thread_current()->pml4, page->va, 0);
+
 	return true;
 }
 
@@ -99,15 +101,19 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-	
+
 	struct file *reopened_file = file_reopen(file);
+	if (file_length(reopened_file) - offset <= 0) 
+		return NULL;
+
 	size_t temp_length = length < file_length(reopened_file) ? length : file_length(reopened_file);
-	size_t temp_zero_length = PGSIZE - temp_length % PGSIZE;
+	size_t temp_zero_length = PGSIZE - (temp_length % PGSIZE);
 	
 	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
 	// if(offset % PGSIZE != 0) return NULL;
 
 	file_seek(reopened_file, offset);
+	void * current_addr = addr;
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -125,7 +131,8 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->zero_bytes = page_zero_bytes;
 		aux->has_next = temp_length > PGSIZE;
 
-		if( !vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment_by_file, aux) ){	
+		if( !vm_alloc_page_with_initializer(VM_FILE, current_addr, writable, lazy_load_segment_by_file, aux) ){	
+			file_close(reopened_file);
 			free(aux);
 			return NULL;
 		}
@@ -133,14 +140,12 @@ do_mmap (void *addr, size_t length, int writable,
 		/* Advance. */
 		temp_length -= page_read_bytes;
 		temp_zero_length -= page_zero_bytes;
-		addr += PGSIZE;
-		offset += page_read_bytes;
+		current_addr += PGSIZE;
+		offset += PGSIZE;
 	}
 
 	return addr;
 }
-
-
 
 /* Do the munmap */
 void
