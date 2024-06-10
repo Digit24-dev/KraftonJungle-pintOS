@@ -34,6 +34,7 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page->offset = info->offset;
 	file_page->read_bytes = info->read_bytes;
 	file_page->zero_bytes = info->zero_bytes;
+	return true;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -80,8 +81,10 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	size_t page_read_bytes = info->read_bytes;
 	size_t page_zero_bytes = info->zero_bytes;
 	
-	// read_at으로 하니 필요 없을 듯
 	file_seek (file, offset); 
+	
+	if (page->frame->kva == NULL)
+		return false;
 
 	/* Do calculate how to fill this page.
 	 * We will read PAGE_READ_BYTES bytes from FILE
@@ -93,9 +96,6 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	// read_byte = file_read_at(file, page->frame->kva, page_read_bytes, offset);
 	// if(read_byte != page_read_bytes) 
 	// 	return false;
-
-	// 읽어야 할 길이가 PGSIZE의 배수가 아닌 경우
-	// stick out 조치
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
 	return true;
@@ -106,13 +106,14 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	
-	struct file *f = file_reopen(file);
-	size_t temp_length = length < file_length(f) ? length : file_length(f);
+	struct file *reopened_file = file_reopen(file);
+	size_t temp_length = length < file_length(reopened_file) ? length : file_length(reopened_file);
 	size_t temp_zero_length = PGSIZE - temp_length % PGSIZE;
+	
 	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
 	// if(offset % PGSIZE != 0) return NULL;
 
-	file_seek(file, offset);
+	file_seek(reopened_file, offset);
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -124,7 +125,7 @@ do_mmap (void *addr, size_t length, int writable,
 		if (aux == NULL)
 			return NULL;
 		
-		aux->file = file;
+		aux->file = reopened_file;
 		aux->offset = offset;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;
@@ -139,15 +140,9 @@ do_mmap (void *addr, size_t length, int writable,
 		temp_length -= page_read_bytes;
 		temp_zero_length -= page_zero_bytes;
 		addr += PGSIZE;
-		/*
-			파일에서 데이터를 읽어올 때 파일 오프셋을 적절히 이동시키기 위해서이다.
-			load_segment 함수는 파일의 특정 오프셋부터 시작하여 세그먼트를 로드한다. 
-			이때 세그먼트의 크기가 페이지 크기보다 클 경우, 여러 페이지에 걸쳐서 세그먼트를 로드해야 한다.
-			각 반복마다 page_read_bytes 만큼의 데이터를 파일에서 읽어와 페이지에 로드하고,
-			이 때 파일 오프셋 ofs를 page_read_bytes 만큼 증가시켜야 다음 페이지를 로드할 때 파일의 올바른 위치에서 데이터를 읽어올 수 있다.
-		*/
 		offset += page_read_bytes;
 	}
+
 	return addr;
 }
 
@@ -162,9 +157,12 @@ do_munmap (void *addr) {
 		return;
 	
 	bool has_next;
+	// struct file* file = page->file.file;
 	do {
 		has_next = page->file.has_next;
+		// destroy(page);
 		spt_remove_page(&t->spt, page);
 		addr += PGSIZE;
 	} while (has_next && (page = spt_find_page(&t->spt, addr)));
+	// file_close(file);
 }
