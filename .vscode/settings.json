@@ -34,6 +34,7 @@
         "hash.h": "c",
         "inspect.h": "c",
         "fixed_point.h": "c",
-        "uninit.h": "c"
+        "uninit.h": "c",
+        "main.h": "c"
     }
 }
