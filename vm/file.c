@@ -111,7 +111,7 @@ do_mmap (void *addr, size_t length, int writable,
 	
 	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
 	// if(offset % PGSIZE != 0) return NULL;
-
+	void * current_addr = addr;
 	file_seek(reopened_file, offset);
 	void * current_addr = addr;
 
@@ -132,6 +132,7 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->zero_bytes = page_zero_bytes;
 		aux->has_next = temp_length > PGSIZE;
 
+
 		if( !vm_alloc_page_with_initializer(VM_FILE, current_addr, writable, lazy_load_segment_by_file, aux) ){	
 			file_close(reopened_file);
 			free(aux);
@@ -141,8 +142,10 @@ do_mmap (void *addr, size_t length, int writable,
 		/* Advance. */
 		temp_length -= page_read_bytes;
 		temp_zero_length -= page_zero_bytes;
+
 		current_addr += PGSIZE;
-		offset += PGSIZE;
+		offset += page_read_bytes;
+
 	}
 
 	return addr;

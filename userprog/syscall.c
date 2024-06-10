@@ -77,6 +77,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
 
+	// intr_dump_frame(f);
+
 	thread_current()->rsp = f->rsp;
 
 	// check validity
@@ -269,7 +271,9 @@ int open (const char *file)
 	struct file* param = filesys_open(file);
 	lock_release(&filesys_lock);
 	if (param == NULL) return -1;
-	return thread_add_file(param);
+	int fd = thread_add_file(param);
+	
+	return fd; 
 }
 
 int filesize (int fd)
