@@ -60,7 +60,13 @@ file_backed_destroy (struct page *page) {
 		pml4_set_dirty(t->pml4, page->va, false);
 	}
 	pml4_clear_page(t->pml4, page->va);
+  file_close( page->file.file );
 }
+// static void
+// file_backed_destroy (struct page *page) {
+// 	struct file_page *file_page UNUSED = &page->file;
+
+// }
 
 static bool
 lazy_load_segment_by_file (struct page *page, void *aux) {
@@ -76,8 +82,8 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	size_t page_zero_bytes = info->zero_bytes;
 	
 	file_seek (file, offset); 
-	
-	if (page->frame->kva == NULL)
+
+	if(page->frame->kva == NULL)
 		return false;
 
 	/* Do calculate how to fill this page.
@@ -114,6 +120,7 @@ do_mmap (void *addr, size_t length, int writable,
 
 	file_seek(reopened_file, offset);
 	void * current_addr = addr;
+
 	while (temp_length > 0 || temp_zero_length > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
