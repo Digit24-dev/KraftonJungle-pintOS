@@ -13,7 +13,10 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
-
+#ifndef VM
+#define VM
+#define USERPROG
+#endif
 // #define USERPROG
 #define MAX_FDT	128
 

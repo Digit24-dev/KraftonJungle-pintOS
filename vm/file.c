@@ -4,6 +4,7 @@
 #include "vm/vm.h"
 #include "string.h"
 #include "threads/mmu.h"
+#include "devices/disk.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -42,12 +43,21 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+	struct file *reopened_file = file_reopen(file_page->file);
+	return true;
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+
+	if (pml4_is_dirty(&thread_current()->pml4, page->va)) {
+		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->offset);
+		pml4_set_dirty(&thread_current()->pml4, page->va, false);
+	}
+
+	return true;
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
