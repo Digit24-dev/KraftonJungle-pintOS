@@ -1,6 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 // #define VM
+// #define USERPROG
 /* project 3 */
 #include <debug.h>
 #include <list.h>

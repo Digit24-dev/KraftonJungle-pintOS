@@ -24,6 +24,7 @@ bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_
  * data AUX. */
 void hash_action_func_impl (struct hash_elem *e, void *aux){
 	struct page *p = hash_entry(e, struct page, h_elem);
+	// list_remove(&p->frame->f_elem);
 	destroy(p);
 	free(p);
 }
@@ -42,7 +43,6 @@ vm_init (void) {
 	/* TODO: Your code goes here. */
 	list_init(&frame_table);
 	lock_init(&frame_lock);
-
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -150,9 +150,37 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
-	/* LRU or Clock ? */
 	/* only manages frames for user pages (PAL_USER) */
 
+	/* Project 3 - Swap DISK (CLOCK algorithm) */
+	/* Q1: Clock 알고리즘에서 시작하는 주소는 항상 프레임 테이블의 처음이어도 될까? */
+	/* Q2: 전역 변수로 위치를 저장해둔다면 어떻게 해야되나? */
+	/* Q3: No need to frame_lock? */
+	lock_acquire(&frame_lock);
+	struct list_elem *e = list_begin(&frame_table);
+	while (e)
+	{
+		struct frame *cur_frame = list_entry(e, struct frame, f_elem);
+		uint64_t *cur_pml4 = thread_current()->pml4;
+		const void* upage = cur_frame->page->va;
+
+		/* if kernel address */
+		if (pml4_is_accessed(cur_pml4, cur_frame->page->va))
+			pml4_set_accessed(cur_pml4, cur_frame->page->va, false);
+		else 
+		{
+			victim = cur_frame;
+			break;
+		}
+		
+		if (e == list_end(&frame_table))
+		{
+			e = list_begin(&frame_table);
+			continue;
+		}
+		e = list_next(e);
+	}
+	lock_release(&frame_lock);
 	return victim;
 }
 
@@ -162,6 +190,16 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+	list_remove(&victim->f_elem);
+	if (victim != NULL) {
+		if (!swap_out(victim->page))
+			return NULL;
+
+		return victim;
+	}
+	else {
+		PANIC("PANIC!");
+	}
 
 	return NULL;
 }
@@ -174,7 +212,7 @@ vm_evict_frame (void) {
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
-    frame->kva = palloc_get_page(PAL_USER);
+    frame->kva = palloc_get_page(PAL_USER | PAL_ZERO);
 
     if (frame->kva == NULL) {
         frame = vm_evict_frame();
@@ -182,9 +220,7 @@ vm_get_frame (void) {
 
         return frame;
     }
-	// lock_acquire(&frame_lock);
-    list_push_back (&frame_table, &frame->f_elem);
-	// lock_release(&frame_lock);
+	
     frame->page = NULL;
 
     return frame;
@@ -272,6 +308,10 @@ vm_do_claim_page (struct page *page) {
 	frame->page = page;
 	page->frame = frame;
 	
+	// lock_acquire(&frame_lock);
+    list_push_back (&frame_table, &frame->f_elem);
+	// lock_release(&frame_lock);
+
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *curr = thread_current();
     bool success = pml4_set_page (curr->pml4, page->va, frame->kva, page->writable);
@@ -353,7 +393,4 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	hash_clear(&spt->hash_brown, hash_action_func_impl);
 }
 
-bool delete_page(struct hash *pages, struct page *p) {
-	return !hash_delete(pages, &p->h_elem)? true : false;
-}
 /* Project 3 */
