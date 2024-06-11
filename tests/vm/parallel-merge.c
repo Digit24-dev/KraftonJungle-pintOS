@@ -10,6 +10,7 @@
 #include "tests/lib.h"
 #include "tests/main.h"
 
+
 #define CHUNK_SIZE (128 * 1024)
 #define CHUNK_CNT 8                             /* Number of chunks. */
 #define DATA_SIZE (CHUNK_CNT * CHUNK_SIZE)      /* Buffer size. */
@@ -51,7 +52,8 @@ sort_chunks (const char *subprocess, int exit_status)
 
       /* Write this chunk to a file. */
       snprintf (fn, sizeof fn, "buf%zu", i);
-      create (fn, CHUNK_SIZE);
+      int iscreate = create (fn, CHUNK_SIZE);
+
       quiet = true;
       CHECK ((handle = open (fn)) > 1, "open \"%s\"", fn);
       write (handle, buf1 + CHUNK_SIZE * i, CHUNK_SIZE);
@@ -143,7 +145,7 @@ verify (void)
 
 void
 parallel_merge (const char *child_name, int exit_status)
-{
+{ 
   init ();
   sort_chunks (child_name, exit_status);
   merge ();

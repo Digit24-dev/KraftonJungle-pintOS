@@ -311,17 +311,18 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 					return false;
 			}
         }
-		// File-Backed
-		else if (VM_TYPE(type) == VM_FILE) {
+		// 이 분기를 타는 페이지들은 전부 fork된 file_page를 부모로 가진 
+		// 생성될 uninit page들 뿐이다. 
+		else if (VM_TYPE(type) == VM_FILE) { 
 			struct lazy_load_info *info = malloc(sizeof(struct lazy_load_info));
 			info->file = src_page->file.file;
 			info->ofs = src_page->file.offset;
 			info->read_bytes = src_page->file.read_bytes;
 			info->zero_bytes = src_page->file.zero_bytes;
-
+			// 자식 만들기
 			if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, info))
 				return false;
-				
+			// 진로 강요
 			struct page *dst_file_page = spt_find_page(dst, upage);
 			file_backed_initializer(dst_file_page, type, NULL);
 			dst_file_page->frame = src_page->frame;
