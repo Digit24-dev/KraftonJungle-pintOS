@@ -27,6 +27,7 @@ void hash_action_func_impl (struct hash_elem *e, void *aux){
 	destroy(p);
 	free(p);
 }
+/* Project 3 */
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -42,6 +43,7 @@ vm_init (void) {
 	/* TODO: Your code goes here. */
 	list_init(&frame_table);
 	lock_init(&frame_lock);
+	// 스왑 테이블 할당
 
 }
 
@@ -148,10 +150,76 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	struct frame *victim = NULL;
+	// struct frame *victim = NULL;
+	// /* TODO: The policy for eviction is up to you. */
+	// /* only manages frames for user pages (PAL_USER) */
+	
+	// /* Project 3 - Swap DISK (CLOCK algorithm) */
+	// /* Q1: Clock 알고리즘에서 시작하는 주소는 항상 프레임 테이블의 처음이어도 될까? */
+	// /* Q2: 전역 변수로 위치를 저장해둔다면 어떻게 해야되나? */
+	// /* Q3: No need to frame_lock? */
+	// lock_acquire(&frame_lock);
+	// struct list_elem *e = list_begin(&frame_table);
+	// while ( e )
+	// {	//!= list_end(&frame_table)
+	// 	struct frame *cur_frame = list_entry(e, struct frame, f_elem);
+	// 	uint64_t *cur_pml4 = thread_current()->pml4;
+	// 	const void* upage = cur_frame->page->va;
+
+	// 	/* if kernel address */
+	// 	if (is_user_vaddr(upage)) 
+	// 	{
+	// 		if (pml4_is_accessed(cur_pml4, cur_frame))
+	// 			pml4_set_accessed(cur_pml4, cur_frame, false);
+	// 		else 
+	// 		{
+	// 			victim = cur_frame;
+	// 			list_remove(&e);
+	// 			break;
+	// 		}
+	// 	}
+	// 	if(e==list_end(e)){
+	// 		e = list_begin(e);
+	// 		continue;
+	// 	}
+	// 	e = list_next(e);
+	// }
+	// lock_release(&frame_lock);
+	// /*  */
+	// return victim;
+
+	 struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
-	/* LRU or Clock ? */
-	/* only manages frames for user pages (PAL_USER) */
+	lock_acquire(&frame_lock);
+	size_t lru_len = list_size(&frame_table);
+	struct list_elem *tmp = list_begin(&frame_table);
+	struct frame *tmp_frame;
+	struct list_elem *next_tmp;
+	for (size_t i = 0; i < lru_len; i++)
+	{
+		tmp_frame = list_entry(tmp, struct frame, f_elem);
+		if (pml4_is_accessed(thread_current()->pml4, tmp_frame->page->va))
+		{
+		pml4_set_accessed(thread_current()->pml4, tmp_frame->page->va, false);
+		next_tmp = list_next(tmp);
+		list_remove(tmp);
+		list_push_back(&frame_table, tmp);
+		tmp = next_tmp;
+		continue;
+		}
+		if (victim == NULL)
+		{
+		victim = tmp_frame;
+		next_tmp = list_next(tmp);
+		list_remove(tmp);
+		tmp = next_tmp;
+		continue;
+		}
+		tmp = list_next(tmp);
+	}
+	if (victim == NULL)
+		victim = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
+	lock_release(&frame_lock);
 
 	return victim;
 }
@@ -162,6 +230,19 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+	// printf(" victim type is  %d\n",victim->page->operations->type);
+	if (victim != NULL) {
+		if (!swap_out(victim->page))
+			return NULL;
+		
+		victim->page = NULL;
+		memset(victim->kva, 0, PGSIZE);
+
+		return victim;
+	}
+	else {
+		PANIC("PANIC!");
+	}
 
 	return NULL;
 }
@@ -177,6 +258,8 @@ vm_get_frame (void) {
     frame->kva = palloc_get_page(PAL_USER);
 
     if (frame->kva == NULL) {
+		// PANIC("TODO. ");
+
         frame = vm_evict_frame();
         frame->page = NULL;
 
@@ -215,6 +298,7 @@ printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %lld, rsp: %lld, f-rsp: %lld \n
 	if (addr == NULL || is_kernel_vaddr(addr)) 
 		return false;
 
+	// 커널스택은 없다.
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = spt_find_page(spt, pg_round_down(addr));
 	uint64_t rsp = user ? f->rsp : thread_current()->rsp;
@@ -301,7 +385,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
         void *upage = src_page->va;
         bool writable = src_page->writable;
 
-        // UNINIT: 
+        // 
         if (VM_TYPE(type) == VM_UNINIT) {
 			struct lazy_load_info * temp_info = malloc( sizeof(struct lazy_load_info) );
 			memcpy ( temp_info , ((struct lazy_load_info*) src_page->uninit.aux), sizeof(struct lazy_load_info));
@@ -329,7 +413,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			pml4_set_page(thread_current()->pml4, dst_file_page->va, src_page->frame->kva, src_page->writable);
 			continue;
 		}
-		// Defaults
 		else {
 			if (!vm_alloc_page(page_get_type(src_page), src_page->va, src_page->writable)) 
 				return false;
@@ -357,4 +440,4 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 bool delete_page(struct hash *pages, struct page *p) {
 	return !hash_delete(pages, &p->h_elem)? true : false;
 }
-/* Project 3 */
+
