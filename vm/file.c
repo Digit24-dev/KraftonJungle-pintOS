@@ -1,4 +1,5 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
+/* Project 3 */
 
 #include "vm/vm.h"
 #include "string.h"
@@ -64,9 +65,6 @@ file_backed_destroy (struct page *page) {
 
 static bool
 lazy_load_segment_by_file (struct page *page, void *aux) {
-	
-	// if (page->frame->kva == NULL)
-	// 	return false;
 
 	struct file_page *info = (struct file_page*)aux;
 	struct file *file = info->file;
@@ -86,10 +84,7 @@ lazy_load_segment_by_file (struct page *page, void *aux) {
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
 		return false;
 	}
-	// off_t read_byte = 0;
-	// read_byte = file_read_at(file, page->frame->kva, page_read_bytes, offset);
-	// if(read_byte != page_read_bytes) 
-	// 	return false;
+
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
 	pml4_set_dirty(&thread_current()->pml4, page->va, 0);
@@ -109,8 +104,6 @@ do_mmap (void *addr, size_t length, int writable,
 	size_t temp_length = length < file_length(reopened_file) ? length : file_length(reopened_file);
 	size_t temp_zero_length = PGSIZE - (temp_length % PGSIZE);
 	
-	// if((temp_length + temp_zero_length) % PGSIZE != 0) return NULL;
-	// if(offset % PGSIZE != 0) return NULL;
 	void * current_addr = addr;
 	file_seek(reopened_file, offset);
 
@@ -131,7 +124,6 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->zero_bytes = page_zero_bytes;
 		aux->has_next = temp_length > PGSIZE;
 
-
 		if( !vm_alloc_page_with_initializer(VM_FILE, current_addr, writable, lazy_load_segment_by_file, aux) ){	
 			file_close(reopened_file);
 			free(aux);
@@ -144,7 +136,6 @@ do_mmap (void *addr, size_t length, int writable,
 
 		current_addr += PGSIZE;
 		offset += page_read_bytes;
-
 	}
 
 	return addr;
@@ -160,12 +151,10 @@ do_munmap (void *addr) {
 		return;
 	
 	bool has_next;
-	// struct file* file = page->file.file;
 	do {
 		has_next = page->file.has_next;
-		// destroy(page);
 		spt_remove_page(&t->spt, page);
 		addr += PGSIZE;
 	} while (has_next && (page = spt_find_page(&t->spt, addr)));
-	// file_close(file);
 }
+/* Project 3 */

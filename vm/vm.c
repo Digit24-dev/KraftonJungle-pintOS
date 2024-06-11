@@ -27,8 +27,6 @@ void hash_action_func_impl (struct hash_elem *e, void *aux){
 	destroy(p);
 	free(p);
 }
-/* Project 3 */
-
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -179,8 +177,6 @@ vm_get_frame (void) {
     frame->kva = palloc_get_page(PAL_USER);
 
     if (frame->kva == NULL) {
-		PANIC("TODO. ");
-
         frame = vm_evict_frame();
         frame->page = NULL;
 
@@ -305,7 +301,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
         void *upage = src_page->va;
         bool writable = src_page->writable;
 
-        // 
+        // UNINIT: 
         if (VM_TYPE(type) == VM_UNINIT) {
 			struct lazy_load_info * temp_info = malloc( sizeof(struct lazy_load_info) );
 			memcpy ( temp_info , ((struct lazy_load_info*) src_page->uninit.aux), sizeof(struct lazy_load_info));
@@ -315,7 +311,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 					return false;
 			}
         }
-		// 
+		// File-Backed
 		else if (VM_TYPE(type) == VM_FILE) {
 			struct lazy_load_info *info = malloc(sizeof(struct lazy_load_info));
 			info->file = src_page->file.file;
@@ -332,6 +328,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			pml4_set_page(thread_current()->pml4, dst_file_page->va, src_page->frame->kva, src_page->writable);
 			continue;
 		}
+		// Defaults
 		else {
 			if (!vm_alloc_page(page_get_type(src_page), src_page->va, src_page->writable)) 
 				return false;
@@ -359,3 +356,4 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 bool delete_page(struct hash *pages, struct page *p) {
 	return !hash_delete(pages, &p->h_elem)? true : false;
 }
+/* Project 3 */
