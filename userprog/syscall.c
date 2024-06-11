@@ -48,13 +48,7 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
-
-// bool
-// address_check (void *pointer) {
-// 	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
-// 		exit(-1);
-// }
-
+#ifdef VM
 bool
 address_check (void *pointer) {
 	// NULL 포인터 | 커널 VM을 가르킴 | 매핑되지 않은 VM을 가리킴 
@@ -64,6 +58,13 @@ address_check (void *pointer) {
 
 	return true;
 }
+#else
+bool
+address_check (void *pointer) {
+	if (pointer == NULL || is_kernel_vaddr(pointer) || pml4_get_page(thread_current()->pml4, pointer) == NULL)
+		exit(-1);
+}
+#endif
 
 /* The main system call interface */
 void
@@ -73,15 +74,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t arg2 = f->R.rsi;
 	uint64_t arg3 = f->R.rdx;
 	uint64_t arg4 = f->R.r10;
-	// uint64_t arg4 = f->R.rcx;
 	uint64_t arg5 = f->R.r8;
 	uint64_t arg6 = f->R.r9;
 
-	// intr_dump_frame(f);
-
 	thread_current()->rsp = f->rsp;
 
-	// check validity
 	switch (f->R.rax)
 	{
 		case SYS_HALT:
@@ -355,11 +352,11 @@ int exec (const char *file)
 	char *temp = palloc_get_page(PAL_ZERO);
 	strlcpy(temp, file, strlen(file) + 1);
 	// sema_down(&thread_current()->sema_load);
-	if (!lock_held_by_current_thread(&filesys_lock))
-		lock_acquire(&filesys_lock);
+	// if (!lock_held_by_current_thread(&filesys_lock))
+	// 	lock_acquire(&filesys_lock);
 	if (process_exec(temp) == -1)
 		exit(-1);
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 	return -1;
 
 }
