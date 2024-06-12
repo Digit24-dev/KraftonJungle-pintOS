@@ -182,20 +182,39 @@ disk_print_stats (void) {
 1:0 - scratch
 1:1 - swap
 */
+/* DEV_NO로 번호가 매겨진 디스크를 반환합니다.
+   DEV_NO는 각각 마스터 또는 슬레이브에 대해 0 또는 1이 될 수 있으며,
+   CHAN_NO로 번호가 매겨진 채널 내에 있습니다.
+
+   Pintos는 디스크를 다음과 같이 사용합니다:
+0:0 - 부트 로더, 명령줄 인수, 운영 체제 커널
+0:1 - 파일 시스템
+1:0 - 임시 저장소
+1:1 - 스왑
+*/
 struct disk *
 disk_get (int chan_no, int dev_no) {
-	ASSERT (dev_no == 0 || dev_no == 1);
+    // DEV_NO는 0 또는 1이어야 합니다.
+    ASSERT (dev_no == 0 || dev_no == 1);
 
-	if (chan_no < (int) CHANNEL_CNT) {
-		struct disk *d = &channels[chan_no].devices[dev_no];
-		if (d->is_ata)
-			return d;
-	}
-	return NULL;
+    // CHAN_NO가 유효한 범위 내에 있는지 확인합니다.
+    if (chan_no < (int) CHANNEL_CNT) {
+        // 주어진 채널 번호와 디스크 번호에 해당하는 디스크 구조체를 가져옵니다.
+        struct disk *d = &channels[chan_no].devices[dev_no];
+        
+        // 해당 디스크가 ATA 디스크인지 확인합니다.
+        if (d->is_ata)
+            // ATA 디스크라면, 해당 디스크 구조체를 반환합니다.
+            return d;
+    }
+    // 유효한 디스크를 찾지 못하면 NULL을 반환합니다.
+    return NULL;
 }
 
 /* Returns the size of disk D, measured in DISK_SECTOR_SIZE-byte
    sectors. */
+/* 디스크 D의 크기를 반환합니다.
+   크기는 DISK_SECTOR_SIZE 바이트 크기의 섹터로 측정됩니다. */
 disk_sector_t
 disk_size (struct disk *d) {
 	ASSERT (d != NULL);
@@ -207,23 +226,44 @@ disk_size (struct disk *d) {
    room for DISK_SECTOR_SIZE bytes.
    Internally synchronizes accesses to disks, so external
    per-disk locking is unneeded. */
+/* 디스크 D에서 섹터 SEC_NO를 읽어 BUFFER에 저장합니다. 
+   BUFFER는 DISK_SECTOR_SIZE 바이트의 공간을 가지고 있어야 합니다.
+   디스크 접근은 내부적으로 동기화되므로, 외부에서 디스크별 잠금을 할 필요가 없습니다. */
 void
 disk_read (struct disk *d, disk_sector_t sec_no, void *buffer) {
-	struct channel *c;
+    struct channel *c;
 
-	ASSERT (d != NULL);
-	ASSERT (buffer != NULL);
+    // 디스크와 버퍼가 NULL이 아닌지 확인합니다.
+    ASSERT (d != NULL);
+    ASSERT (buffer != NULL);
 
-	c = d->channel;
-	lock_acquire (&c->lock);
-	select_sector (d, sec_no);
-	issue_pio_command (c, CMD_READ_SECTOR_RETRY);
-	sema_down (&c->completion_wait);
-	if (!wait_while_busy (d))
-		PANIC ("%s: disk read failed, sector=%"PRDSNu, d->name, sec_no);
-	input_sector (c, buffer);
-	d->read_cnt++;
-	lock_release (&c->lock);
+    // 디스크의 채널을 가져옵니다.
+    c = d->channel;
+
+    // 채널의 잠금을 획득합니다.
+    lock_acquire (&c->lock);
+
+    // 읽을 섹터를 선택합니다.
+    select_sector (d, sec_no);
+
+    // 읽기 명령을 실행합니다.
+    issue_pio_command (c, CMD_READ_SECTOR_RETRY);
+
+    // 명령이 완료될 때까지 대기합니다.
+    sema_down (&c->completion_wait);
+
+    // 디스크가 여전히 바쁜 상태인지 확인하고, 문제가 발생하면 패닉을 발생시킵니다.
+    if (!wait_while_busy (d))
+        PANIC ("%s: disk read failed, sector=%"PRDSNu, d->name, sec_no);
+
+    // 섹터 데이터를 버퍼에 입력합니다.
+    input_sector (c, buffer);
+
+    // 읽기 카운트를 증가시킵니다.
+    d->read_cnt++;
+
+    // 채널의 잠금을 해제합니다.
+    lock_release (&c->lock);
 }
 
 /* Write sector SEC_NO to disk D from BUFFER, which must contain
@@ -231,23 +271,45 @@ disk_read (struct disk *d, disk_sector_t sec_no, void *buffer) {
    acknowledged receiving the data.
    Internally synchronizes accesses to disks, so external
    per-disk locking is unneeded. */
+/* BUFFER에서 디스크 D의 섹터 SEC_NO로 데이터를 작성합니다. 
+   BUFFER는 DISK_SECTOR_SIZE 바이트를 포함해야 합니다.
+   디스크가 데이터를 수신했음을 확인한 후 반환합니다.
+   디스크 접근은 내부적으로 동기화되므로, 외부에서 디스크별 잠금을 할 필요가 없습니다. */
 void
 disk_write (struct disk *d, disk_sector_t sec_no, const void *buffer) {
-	struct channel *c;
+    struct channel *c;
 
-	ASSERT (d != NULL);
-	ASSERT (buffer != NULL);
+    // 디스크와 버퍼가 NULL이 아닌지 확인합니다.
+    ASSERT (d != NULL);
+    ASSERT (buffer != NULL);
 
-	c = d->channel;
-	lock_acquire (&c->lock);
-	select_sector (d, sec_no);
-	issue_pio_command (c, CMD_WRITE_SECTOR_RETRY);
-	if (!wait_while_busy (d))
-		PANIC ("%s: disk write failed, sector=%"PRDSNu, d->name, sec_no);
-	output_sector (c, buffer);
-	sema_down (&c->completion_wait);
-	d->write_cnt++;
-	lock_release (&c->lock);
+    // 디스크의 채널을 가져옵니다.
+    c = d->channel;
+
+    // 채널의 잠금을 획득합니다.
+    lock_acquire (&c->lock);
+
+    // 작성할 섹터를 선택합니다.
+    select_sector (d, sec_no);
+
+    // 쓰기 명령을 실행합니다.
+    issue_pio_command (c, CMD_WRITE_SECTOR_RETRY);
+
+    // 디스크가 여전히 바쁜 상태인지 확인하고, 문제가 발생하면 패닉을 발생시킵니다.
+    if (!wait_while_busy (d))
+        PANIC ("%s: disk write failed, sector=%"PRDSNu, d->name, sec_no);
+
+    // 버퍼의 데이터를 섹터로 출력합니다.
+    output_sector (c, buffer);
+
+    // 명령이 완료될 때까지 대기합니다.
+    sema_down (&c->completion_wait);
+
+    // 쓰기 카운트를 증가시킵니다.
+    d->write_cnt++;
+
+    // 채널의 잠금을 해제합니다.
+    lock_release (&c->lock);
 }
 
 /* Disk detection and identification. */
