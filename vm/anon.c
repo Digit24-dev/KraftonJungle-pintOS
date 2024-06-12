@@ -66,9 +66,6 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 
 	struct anon_page *anon_page = &page->anon;
 
-	anon_page->anon_swap_sector_no = SIZE_MAX;
-	anon_page->thread = thread_current();
-
 	return true;
 }
 
