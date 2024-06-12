@@ -26,6 +26,8 @@ bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_
 void hash_action_func_impl (struct hash_elem *e, void *aux){
 	struct page *p = hash_entry(e, struct page, h_elem);
 	// list_remove(&p->frame->f_elem);
+	// p->frame = NULL;
+	pml4_clear_page(thread_current()->pml4, p->va );
 	destroy(p);
 	free(p);
 }
@@ -374,6 +376,7 @@ vm_do_claim_page (struct page *page) {
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *curr = thread_current();
     bool success = pml4_set_page (curr->pml4, page->va, frame->kva, page->writable);
+
     return success ? swap_in(page, frame->kva) : false;
 }
 
@@ -435,7 +438,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		else {
 			if (!vm_alloc_page(page_get_type(src_page), src_page->va, src_page->writable)) 
 				return false;
-
+			// 주석친 코드들은 Copy on write가 적용 되기 이전의 코드들이며 이것도 매우 잘 동작한다.
+			// 지우지 말았으면 좋겠다.
 			// if (!vm_claim_page(src_page->va))
 			// 	return false;
 			
