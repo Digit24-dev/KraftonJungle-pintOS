@@ -258,7 +258,8 @@ vm_get_frame (void) {
 }
 
 /* Growing the stack. */
-// 스택을 늘려주는 함수이다. 인자로 전달받은 주소에 대해서 가상 페이지를 할당 하고 물리 프레임을 
+// 스택을 늘려주는 함수이다. 인자로 전달받은 주소에 대해서 가상 페이지를 할당 하고 물리 프레임을 연결한다.
+// 연결 또는 할당 실패시 할당한 가상 페이지를 할당해제한다.
 static void
 vm_stack_growth (void *addr UNUSED) {
 	if (!vm_alloc_page(VM_ANON, addr, true) && !vm_claim_page(addr)) {
@@ -272,6 +273,7 @@ vm_handle_wp (struct page *page UNUSED) {
 }
 
 /* Return true on success */
+// 페이지 폴트 발생시 호출되는 함수로 가상 메모리의 핵심 원리인 lazy load를 구현하기 위한 함수다.
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
@@ -280,15 +282,27 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,			// <= ???
 printf("PF Stat:: usr: %d, wr: %d, np: %d, addr: %lld, rsp: %lld, f-rsp: %lld \n", user, write, not_present, addr, thread_current()->rsp, f->rsp);
 #endif
 	/* TODO: Validate the fault */
+	// 주소가 없거나 커널 주소여선 안된다.
 	if (addr == NULL || is_kernel_vaddr(addr)) 
 		return false;
 
-	// 커널스택은 없다.
+	// 커널스택이란건 사실 존재하지 않는다.
+	// 하지만 페이지 폴트가 어느 모드(커널, 유저)에서 발생했는지에 따라 rsp가 바뀌므로 
+	// 해당 부분에 대한 처리를 한다.
+	
+	// ※자세한 설명 >_<※
+	// 페이지 폴트는 페이지 폴트가 난 곳의 주소와, 해당 주소에 접근했던 인터럽트 프레임을 가져오는데
+	// 커널 모드(설령 유저 페이지에 접근했더라도)에서의 인터럽트 프레임과 
+	// 유저 모드에서의 인터럽트 프레임은 가리키는 곳이 다르다.
+	// 우리는 유저 페이지에서의 rsp가 필요하기 때문에 thread 구조체에 rsp를 저장할수 있는 
+	// 변수를 만들고 거기에 rsp를 저장함으로써 이를 해결하였다.
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = spt_find_page(spt, pg_round_down(addr));
 	uint64_t rsp = user ? f->rsp : thread_current()->rsp;
 	// 유저 모드일 경우 Intr_frame의 rsp를 가리켜야 한다.
-
+	// 해당 주소에 실제 매핑된 물리 프레임이 존재하지 않을 경우 이면서,
+	// page가 존재하지 않는다. 해당 주소가 lazy load 대기중이 아닌 처음 할당된 페이지 일경우
+	// 이 경우는 anonpage인 스택에서 anonpage 밖의 주소에 접근한 경우밖에 없기 때문에 스택을 증가시켜준다.
 	if (not_present) {
 		if (page == NULL) {
 			if (pg_round_down(addr) >= (void*)MAX_STACK_BOTTOM && addr < (void*)USER_STACK && addr >= (void*)(rsp - 8)) {
@@ -307,8 +321,8 @@ printf("stack growth! \n");
 		return false;
 
 done:
+	// 다른게 다 끝나면 lazy load의 완성을 위해 물리 프레임을 할당 해준다.
 	return vm_do_claim_page(page);
-
 }
 
 /* Free the page.
@@ -357,6 +371,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 }
 
 /* Copy supplemental page table from src to dst */
+// fork 시에 페이지 전체 복사하기 위한 함수
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
@@ -364,7 +379,10 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	// TODO: src부터 dst까지 spt를 복사
 	struct hash_iterator h_iter;
     hash_first(&h_iter, &src->hash_brown);
-
+	// spt src 순회하면서 다 끄집어내서 
+	// uninit인 경우에 memcpy로 복사해서 spt dst 안에 다 넣어줌
+	// file 인 경우에는 같은 파일을 바라보게 초기화 까지 해서 넣어줌
+	// 다 끝나면 가상 페이지 할당해주고 물리 프레임 붙여주고 spt에 넣어줌
     while (hash_next(&h_iter)) {
         // hash_cur: 현재 elem을 리턴하거나, table의 끝인 null 포인터를 반환하거나
         struct page *src_page = hash_entry(hash_cur(&h_iter), struct page, h_elem);
