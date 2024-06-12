@@ -7,6 +7,7 @@ struct page;
 enum vm_type;
 
 struct anon_page {
+
     struct swap_anon* swap_anon;
 };
 
@@ -15,6 +16,7 @@ struct swap_anon {
     disk_sector_t sectors[8];
     struct page* page;
     struct list_elem s_elem;
+
 };
 
 void vm_anon_init (void);

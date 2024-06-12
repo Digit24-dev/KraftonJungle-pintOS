@@ -71,6 +71,7 @@ file_backed_swap_out (struct page *page) {
 	page->frame = NULL;
 	page->swapped = true;
 	pml4_clear_page(thread_current()->pml4, page->va);
+
 	return true;
 }
 
