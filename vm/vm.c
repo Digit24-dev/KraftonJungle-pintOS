@@ -13,7 +13,7 @@ uint64_t hash_hash_func_impl(const struct hash_elem *e, void *aux){
 	struct page *p = hash_entry(e, struct page, h_elem);
 	return hash_bytes(&p->va, sizeof p->va);
 }
-
+// 해시 비교 함수
 bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_, void *aux){
 	struct page *a = hash_entry(a_, struct page, h_elem);
 	struct page *b = hash_entry(b_, struct page, h_elem);
@@ -22,6 +22,7 @@ bool hash_less_func_impl (const struct hash_elem *a_, const struct hash_elem *b_
 
 /* Performs some operation on hash element E, given auxiliary
  * data AUX. */
+// 해시에 들어간 페이지를 할당 해제하고 삭제
 void hash_action_func_impl (struct hash_elem *e, void *aux){
 	struct page *p = hash_entry(e, struct page, h_elem);
 	// list_remove(&p->frame->f_elem);
@@ -42,10 +43,10 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	// 프레임 테이블과 프레임 락 초기화
 	list_init(&frame_table);
 	lock_init(&frame_lock);
 	// 스왑 테이블 할당
-
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -77,16 +78,20 @@ static struct frame *vm_evict_frame (void);
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
-
-	ASSERT (VM_TYPE(type) != VM_UNINIT)
+	// 다른 페이지로 변화할 uninit page를 만들어 주는것이기 때문에 type이 uninit page로 오는 요청은 에러
+	ASSERT (VM_TYPE(type) != VM_UNINIT);
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
 	// 주소 검증은 필요 없을까?
 	/* Check wheter the upage is already occupied or not. */
+	// 요청한 주소가 이미 가상 메모리가(page) 할당되어 있는지 확인
 	if (spt_find_page (spt, upage) == NULL) {
+		// 없다면 페이지 메모리 할당 후 타입에 따라 처리한다.
 		struct page *newpage = malloc(sizeof(struct page));
 
+		// 각 페이지는 page algined 이어야 하기 때문에 pg_round_down을 이용, 페이지의 시작 주소를 넘겨준다.
+		// vm type에 따라 초기화 함수를 다르게 지정해준다.
 		switch (VM_TYPE(type))
 		{
 		case VM_ANON:
@@ -103,6 +108,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		/* after uninit_new, you have to fix fields. */
 		newpage->writable = writable;
 		
+		// 보조 페이지 테이블은 spt에 삽입한다.
 		/* TODO: Insert the page into the spt. */
 		if (spt_insert_page(spt, newpage)) 
 			return true;
@@ -115,6 +121,7 @@ err:
 }
 
 /* Find VA from spt and return page. On error, return NULL. */
+// spt 안의 해시 테이블에서 h_elem으로 hash_elem을 뽑아내고 그걸 기반으로 hash_entry로 page 객체로 접근한다.
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = (struct page*)malloc(sizeof(struct page));
@@ -149,45 +156,9 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 }
 
 /* Get the struct frame, that will be evicted. */
+// disk swap시에 희생자 페이지를 정하는 알고리즘 CLOCK 알고리즘으로 짜여져 있다 LRU도 가능하다
 static struct frame *
 vm_get_victim (void) {
-	// struct frame *victim = NULL;
-	// /* TODO: The policy for eviction is up to you. */
-	// /* only manages frames for user pages (PAL_USER) */
-	
-	// /* Project 3 - Swap DISK (CLOCK algorithm) */
-	// /* Q1: Clock 알고리즘에서 시작하는 주소는 항상 프레임 테이블의 처음이어도 될까? */
-	// /* Q2: 전역 변수로 위치를 저장해둔다면 어떻게 해야되나? */
-	// /* Q3: No need to frame_lock? */
-	// lock_acquire(&frame_lock);
-	// struct list_elem *e = list_begin(&frame_table);
-	// while ( e )
-	// {	//!= list_end(&frame_table)
-	// 	struct frame *cur_frame = list_entry(e, struct frame, f_elem);
-	// 	uint64_t *cur_pml4 = thread_current()->pml4;
-	// 	const void* upage = cur_frame->page->va;
-
-	// 	/* if kernel address */
-	// 	if (is_user_vaddr(upage)) 
-	// 	{
-	// 		if (pml4_is_accessed(cur_pml4, cur_frame))
-	// 			pml4_set_accessed(cur_pml4, cur_frame, false);
-	// 		else 
-	// 		{
-	// 			victim = cur_frame;
-	// 			list_remove(&e);
-	// 			break;
-	// 		}
-	// 	}
-	// 	if(e==list_end(e)){
-	// 		e = list_begin(e);
-	// 		continue;
-	// 	}
-	// 	e = list_next(e);
-	// }
-	// lock_release(&frame_lock);
-	// /*  */
-	// return victim;
 
 	 struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
@@ -195,21 +166,30 @@ vm_get_victim (void) {
 
 	/* Project 3 - Swap DISK (CLOCK algorithm) */
 	/* Q1: Clock 알고리즘에서 시작하는 주소는 항상 프레임 테이블의 처음이어도 될까? */
+	/* A1: 어디서 시작하든 상관 없을것 같음, 하지만 필요하다면 마지막에 시곗바늘이 멈춘 곳을 저장해도 좋을듯 */
 	/* Q2: 전역 변수로 위치를 저장해둔다면 어떻게 해야되나? */
+	/* A2: frame_table에 마지막 으로 선정한 위치 e를 저장하고 알고리즘 시작 전 리스트를 순회하여 저장한 위치와 맞는 elem을 꺼내야한다.
+		   그러나 이는 매우 비효율적이므로 알고리즘 시작 전, frame table을 정렬한 후 찾는걸 추천 */
 	/* Q3: No need to frame_lock? */
+	/* A3: need lock 연산의 원자성을 보장해야 함. 그러지 않으면 연산 도중 잦은 접근 비트 변경으로 인해 잘못된 페이지가 
+	       선택되고 이로인해 성능의 저하가 발생할 수 있음. */
 	lock_acquire(&frame_lock);
 	struct list_elem *e = list_begin(&frame_table);
+	// 리스트에서 원소 하나를 꺼내어 알고리즘에 의해 어느 한 프레임이 선택될 때까지 순회한다.
 	while (e)
 	{
 		struct frame *cur_frame = list_entry(e, struct frame, f_elem);
 		uint64_t *cur_pml4 = thread_current()->pml4;
 		const void* upage = cur_frame->page->va;
 
+		// 클락 알고리즘은 참조된 적이 있는 프레임에 접근하면 해당 프레임의 참조 비트를 초기화하고
 		/* if kernel address */
 		if (pml4_is_accessed(cur_pml4, cur_frame->page->va))
 			pml4_set_accessed(cur_pml4, cur_frame->page->va, false);
 		else 
 		{
+			// 참조된 적이 없는 프레임에 도달할 때까지 순회한다.
+			// 참조된 적이 없는 프레임에 도달하면 해당 프레임을 선택하고 순회를 종료한다.
 			victim = cur_frame;
 			break;
 		}
@@ -227,12 +207,18 @@ vm_get_victim (void) {
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
+// vm_get_victim 함수로 설정된 희생자 프레임을 반환해주는 함수
 static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+	// 희생자로 선택되어 곧 죽을거니까 프레임 테이블에서도 빼버린다
 	list_remove(&victim->f_elem);
+	// 희생자가 선택되지 않았으면 패닉에 빠진다.
 	if (victim != NULL) {
+		// 해당페이지 초기화시에 swap_out으로 매핑된 함수를 실행하게 되는데,
+		// 스왑 아웃하는데 실패하면 NULL을 반환한다.
+		// 희생자가 잔혹하게 희생되는 모습. ㅠㅠ
 		if (!swap_out(victim->page))
 			return NULL;
 
@@ -253,11 +239,13 @@ vm_evict_frame (void) {
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
+	// 유저 풀에서 0으로 초기화된 따끈따끈한 물리 프레임
     frame->kva = palloc_get_page(PAL_USER | PAL_ZERO);
-
+	// 만약 유저 풀에 자리가 없어 새 프레임을 얻을 수 없다면 
     if (frame->kva == NULL) {
 		// PANIC("TODO. ");
-
+		// 희생자를 선택한다. ( OS는 잔혹하다 )
+		// 희생자 프레임을 얻은 후 해당 프레임에 기존에 연결되어있던 가상 페이지를 NULL로 초기화 한 후 반환
         frame = vm_evict_frame();
         frame->page = NULL;
 
@@ -270,6 +258,7 @@ vm_get_frame (void) {
 }
 
 /* Growing the stack. */
+// 스택을 늘려주는 함수이다. 인자로 전달받은 주소에 대해서 가상 페이지를 할당 하고 물리 프레임을 
 static void
 vm_stack_growth (void *addr UNUSED) {
 	if (!vm_alloc_page(VM_ANON, addr, true) && !vm_claim_page(addr)) {
@@ -343,7 +332,6 @@ vm_claim_page (void *va UNUSED) {
 /* Claim the PAGE and set up the mmu. */
 /* vm_get_frame()을 호출하여 frame에 새로운 물리 프레임 할당 */
 /* 그리고 page에 frame을 매핑해준다. */
-
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
