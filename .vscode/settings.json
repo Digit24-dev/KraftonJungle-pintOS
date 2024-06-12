@@ -35,6 +35,9 @@
         "inspect.h": "c",
         "fixed_point.h": "c",
         "uninit.h": "c",
-        "main.h": "c"
+        "main.h": "c",
+        "disk.h": "c",
+        "free-map.h": "c",
+        "lib.h": "c"
     }
 }
