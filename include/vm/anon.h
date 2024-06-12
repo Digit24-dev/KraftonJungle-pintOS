@@ -22,4 +22,6 @@ struct swap_anon {
 void vm_anon_init (void);
 bool anon_initializer (struct page *page, enum vm_type type, void *kva);
 
+#define SECTORS_PER_PAGE (1<<12)/512
+
 #endif
