@@ -4,6 +4,7 @@
 #include <hash.h>
 #include "threads/palloc.h"
 #include <hash.h>
+#include "devices/disk.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -51,7 +52,7 @@ struct page {
 	/* Your implementation */
 	struct hash_elem h_elem;
 	bool writable;
-
+	bool swapped;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
