@@ -2,15 +2,10 @@
 
 #include "vm/vm.h"
 #include "devices/disk.h"
-#include "lib/kernel/bitmap.h"
 #include "threads/mmu.h"
 
 /* DO NOT MODIFY BELOW LINE */
 static struct disk *swap_disk;
-/* Project 3 */
-static struct bitmap *disk_bitmap;
-static struct lock bitmap_lock;
-
 static bool anon_swap_in (struct page *page, void *kva);
 static bool anon_swap_out (struct page *page);
 static void anon_destroy (struct page *page);
@@ -65,8 +60,6 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &anon_ops;
 
 	struct anon_page *anon_page = &page->anon;
-
-	return true;
 }
 
 /* Swap in the page by read contents from the swap disk. */
