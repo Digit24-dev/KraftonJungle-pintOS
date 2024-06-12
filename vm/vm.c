@@ -270,6 +270,15 @@ vm_stack_growth (void *addr UNUSED) {
 /* Handle the fault on write_protected page */
 static bool
 vm_handle_wp (struct page *page UNUSED) {
+  // 공유하고 있는 부모의 kva 저장
+  void *parent_kva = page->frame->kva;
+	//새로 물리메모리 할당
+  page->frame->kva = palloc_get_page(PAL_USER);
+	//기존 부모의 데이터 복사
+  memcpy(page->frame->kva, parent_kva, PGSIZE);
+  pml4_set_page(thread_current()->pml4, page->va, page->frame->kva, page->writable);
+
+  return true;
 }
 
 /* Return true on success */
@@ -319,6 +328,10 @@ printf("stack growth! \n");
 
 	if (write && !page->writable)
 		return false;
+
+	// cow 분기
+	if(write && !not_present && page->writable && page)
+		return vm_handle_wp(page);
 
 done:
 	// 다른게 다 끝나면 lazy load의 완성을 위해 물리 프레임을 할당 해준다.
@@ -423,12 +436,29 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			if (!vm_alloc_page(page_get_type(src_page), src_page->va, src_page->writable)) 
 				return false;
 
-			if (!vm_claim_page(src_page->va))
-				return false;
+			// if (!vm_claim_page(src_page->va))
+			// 	return false;
 			
 			// 매핑된 프레임에 내용 로딩
 			struct page *dst_page = spt_find_page(dst, upage);
-			memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+			// memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+
+			// cow 하려고 만든 부분
+			struct frame *cpy_frame = malloc(sizeof(struct frame));
+			dst_page->frame = cpy_frame;
+			cpy_frame->page = dst_page;
+			// 자식 frame 구조체를 만들고 물리메모리의 시작 주소 kva를 부모와 같은 곳을 가리키도록 할당한다.
+      		cpy_frame->kva = src_page->frame->kva;
+			lock_acquire(&frame_lock);
+			list_push_back(&frame_table, &cpy_frame->f_elem);
+			lock_release(&frame_lock);
+			// 자식의 page에 대한 pml4 맵핑 시 writable 0으로 만들어준다.
+			if (pml4_set_page(thread_current()->pml4, dst_page->va, cpy_frame->kva, 0) == false)
+			{
+				return false;
+			}
+			swap_in(dst_page, cpy_frame->kva);
+
 		}
     }
     return true;
