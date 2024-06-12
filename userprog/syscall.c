@@ -15,8 +15,9 @@
 
 #include "userprog/process.h"
 /* Project 3 */
+#ifdef VM
 #include "vm/file.h"
-// #include "string.h"
+#endif
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -147,7 +148,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close((int)arg1);
 			break;
-		
+#ifdef VM
 		case SYS_MMAP:
 			f->R.rax = mmap((void*) arg1,(size_t)arg2, (int)arg3,(int)arg4,(off_t)arg5);
 			break;
@@ -155,7 +156,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_MUNMAP:
 			munmap((void*)arg1);
 			break;
-
+#endif
 		default:
 			exit(-1);
 			break;
@@ -234,13 +235,14 @@ int read (int fd, void *buffer, unsigned length)
 		str_cnt = -1;
 		break;
 	default: {
+#ifdef VM
 			/* project 3 jihun : 
 				프로젝트 3부턴 file_read함수 호출전에
 				그 파일의 권한을 확인해줘야하는 작업이 필요 */
 			struct page *page = spt_find_page(&thread_current()->spt, buffer);
 			if(page != NULL && !page->writable)
 				exit(-1);
-				
+#endif
 			fp = fd_to_file(fd);
 			if (fp == NULL) exit(-1);
 			lock_acquire(&filesys_lock);
@@ -351,17 +353,15 @@ int exec (const char *file)
 {
 	char *temp = palloc_get_page(PAL_ZERO);
 	strlcpy(temp, file, strlen(file) + 1);
-	// sema_down(&thread_current()->sema_load);
-	// if (!lock_held_by_current_thread(&filesys_lock))
-	// 	lock_acquire(&filesys_lock);
+	
 	if (process_exec(temp) == -1)
 		exit(-1);
-	// lock_release(&filesys_lock);
+	
+	/* exec should not return here. */
 	return -1;
-
 }
-
 /* Project 3 */
+#ifdef VM
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	// is addr 0 or length is 0
 	if(addr == NULL || addr + length == NULL || is_kernel_vaddr(addr) || is_kernel_vaddr(addr + length)) return NULL;
@@ -387,3 +387,4 @@ void munmap (void *addr){
 	// if(spt_find_page(&thread_current()->spt, addr) == NULL) exit(-1);
 	do_munmap(addr);
 }
+#endif
