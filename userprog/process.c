@@ -278,15 +278,13 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 
 	sema_down(&child_thread->sema_exit);
-	
+
+	int exit_code = child_thread->exit_code;
 	list_remove(&child_thread->child_elem);
 
 	sema_up(&child_thread->sema_wait);
-	
-	if (child_thread->terminated)
-		return child_thread->exit_code;
 
-	return -1;
+	return exit_code;
 }
 
 /* Exit the process. This function is called by thread_exit (). */

@@ -53,6 +53,7 @@ struct page {
 	struct hash_elem h_elem;
 	bool writable;
 	bool swapped;
+
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -93,6 +94,7 @@ struct page_operations {
  * All designs up to you for this. */
 struct supplemental_page_table {
 	struct hash hash_brown;
+	struct hash swap_table;
 };
 
 #include "threads/thread.h"
@@ -135,4 +137,5 @@ struct lock frame_lock;
 #include "threads/vaddr.h"
 #define MAX_STACK_BOTTOM	USER_STACK - 0x100000	// 1MB
 // #define MAX_STACK_BOTTOM	USER_STACK - (1<<20)	// 1MB
+
 #endif  /* VM_VM_H */
