@@ -3,6 +3,7 @@
 
 #include "threads/thread.h"
 #include "threads/synch.h"
+#include "filesys/off_t.h"
 
 typedef int pid_t;
 

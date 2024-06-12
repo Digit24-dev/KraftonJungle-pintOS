@@ -716,38 +716,37 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
+	/* 파일로부터 세그먼트를 로드한다.
+		주소 VA 에서 첫 번째 페이지 폴트 발생 시 이 함수가 호출된다.
+		이 함수를 호출할 때 VA(가상 주소)를 사용할 수 있다. */
 static bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-	/* 파일로부터 세그먼트를 로드한다.
-		주소 VA 에서 첫 번째 페이지 폴트 발생 시 이 함수가 호출된다.
-		이 함수를 호출할 때 VA(가상 주소)를 사용할 수 있다. */
 	struct lazy_load_info *info = (struct lazy_load_info*)aux;
 	struct file *file = info->file;
 
 	size_t ofs = info->ofs;
-	size_t read_bytes = info->read_bytes;
-	size_t zero_bytes = info->zero_bytes;
+	size_t page_read_bytes = info->read_bytes;
+	size_t page_zero_bytes = info->zero_bytes;
 	
+	/* 읽어야 하는 파일의 포인터를 옮겨준다.
+		struct file* 에는 pos라는 internal parameter가 있는데, 파일을 읽게 되면 파일의 pos 위치 부터 읽는다.
+		따라서, file의 pos를 offset 만큼 띄어줘야 한다. -> file_read_at을 사용하면 필요 없을 것 같으나,
+		후에 파일 swap 과의 일치를 위해서 냅둔다. */
 	file_seek (file, ofs);
 
-	/* Do calculate how to fill this page.
-	 * We will read PAGE_READ_BYTES bytes from FILE
-	 * and zero the final PAGE_ZERO_BYTES bytes. */
-	// size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-	// size_t page_zero_bytes = PGSIZE - page_read_bytes;
-	size_t page_read_bytes = read_bytes;
-	size_t page_zero_bytes = zero_bytes;
-
+	/* 물리 프레임이 할당되지 않았을 경우 */
 	if (page->frame->kva == NULL)
 		return false;
 
-	if (file_read (file, page->frame->kva, read_bytes) != (int) read_bytes) {
+	/* 파일을 읽어 물리 프레임에 작성한다. */
+	if (file_read (file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
 		// palloc_free_page(page->frame->kva);
 		return false;
 	}
+	/* 실제 읽은 부분 외 나머지 부분은 0으로 채운다. -> stick out (?) */
 	memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 	
 	return true;
@@ -767,6 +766,7 @@ lazy_load_segment (struct page *page, void *aux) {
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
+/* ELF 헤더를 읽기 위하여 파일을 읽는 프로시저를 진행한다. */
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
@@ -774,13 +774,17 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	/* 파일에 읽은 데이터가 남았을 때까지 하위 프로시저를 반복한다. */
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
+		/* 페이지 단위로 데이터를 읽고, 해당 데이터를 물리 페이지를 매핑하여 전달할 것이므로, 페이지 단위로 align. */
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 		
+		/* 파일에 대한 데이터는 Lazy Load 되어야 한다. lazy load를 위한 infomation을 malloc으로 할당해둔 뒤에
+			lazy load 가 실행될 때 info를 가져올 수 있도록 한다. */
 		struct lazy_load_info *aux_info = malloc(sizeof(struct lazy_load_info));
 		if (aux_info == NULL)
 			return false;
@@ -791,12 +795,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		aux_info->zero_bytes = page_zero_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
+		/* *Anonymous 페이지를 할당한다. 
+			**Load할 파일을 Anonymous 페이지로 할당하여 업로드 하는 이유!?** -> 기억 안날 경우 노션 찾아보기. */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux_info)) {
+			/* page allocation이 실패할 경우 할당 해주었던 info를 해제해 준다. */
 			free(aux_info);
 			return false;
 		}
 
-		/* Advance. */
+		/* 읽어야 하는 데이터 갯수를 업데이트 해준다. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
@@ -813,6 +820,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
+/* stack_bottom(유저 스택 주소 - 4KB[1개의 페이지])에 스택을 매핑하고 페이지를 즉시 요청한다. */
 static bool
 setup_stack (struct intr_frame *if_) {
 	bool success = false;
@@ -821,10 +829,13 @@ setup_stack (struct intr_frame *if_) {
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
-	/* stack_bottom에 스택을 매핑하고 페이지를 즉시 요청 */
+	/* VM_MARKER_0 -> 스택 페이지임을 나타내는 정보로 사용될 수 있다. 하지만 우리의 프로젝트에서는 사용하지 않았다.
+		스택 성장 시에 스택 포인터는 성장해야 하는 주소를 가리키는 데이터를 나타낼 것이기 때문에 해당 주소va에 대한 pg_round_down(va)의
+		페이지 할당 요청을 할 것이기 때문이다. 이후 스왑에서 사용될 수도 있겠으나, 사용하지 않았다.	*/
 	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true)) {
 		success = vm_claim_page(stack_bottom);
 		
+		/* 성공하면 스택 포인터를 할당 */
 		if (success)
 			if_->rsp = USER_STACK;
 	}
