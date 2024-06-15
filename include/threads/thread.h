@@ -1,7 +1,6 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-// #define VM
-// #define USERPROG
+
 /* project 3 */
 #include <debug.h>
 #include <list.h>
@@ -14,11 +13,7 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
-#ifndef VM
-#define VM
-#define USERPROG
-#endif
-// #define USERPROG
+
 #define MAX_FDT	128
 
 #define MIN(a, b)	(((a) < (b)) ? (a) : (b))

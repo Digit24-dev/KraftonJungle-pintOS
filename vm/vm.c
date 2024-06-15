@@ -27,7 +27,7 @@ void hash_action_func_impl (struct hash_elem *e, void *aux){
 	struct page *p = hash_entry(e, struct page, h_elem);
 	// list_remove(&p->frame->f_elem);
 	// p->frame = NULL;
-	pml4_clear_page(thread_current()->pml4, p->va );
+	// pml4_clear_page(thread_current()->pml4, p->va);
 	destroy(p);
 	free(p);
 }
