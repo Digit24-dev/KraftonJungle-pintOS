@@ -38,6 +38,7 @@
         "main.h": "c",
         "disk.h": "c",
         "free-map.h": "c",
-        "lib.h": "c"
+        "lib.h": "c",
+        "list.h": "c"
     }
 }
