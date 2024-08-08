@@ -170,17 +170,21 @@ means → how busy the system is.
     load_avg = 59/60 * load_avg + 1/60 * number_of_(ready_threads)
     ```
     
-     시간에 대한 고려 없이 위를 단순한 수식으로 본다면, 우변의 59/60*load_avg를 좌변으로 넒겨보면 “1/60*load_avg = 1/60*ready_threads” 가 되면서 load_avg는 ready_threads와 같아지게 된다. 하지만, load_avg의 초기 값은 0이고, ready_threads는 지속적으로 변하는 값이므로, 스레드의 대기큐에 있는 개수의 1/60 만큼의 기울기로 ready_threads를 추종한다. 
+     시간에 대한 고려 없이 위를 단순한 수식으로 본다면, 우변의 59/60*load_avg를 좌변으로 넒겨보면  “1/60 * load_avg = 1/60 * ready_threads” 가 되면서 load_avg는 ready_threads와 같아지게 된다. 하지만, load_avg의 초기 값은 0이고, ready_threads는 지속적으로 변하는 값이므로, 스레드의 대기큐에 있는 개수의 1/60 만큼의 기울기로 ready_threads를 추종한다. 
     
     > **단 한개의 스레드가 대기큐에 존재할 경우에 대한 그래프**
     > 
     - t ⇒ 0 ~ 100
     
-    <img src="../img/graph1.png">
+
+    <img src="../img/graphs/graph1.png">
+
     
     - t ⇒ 0 ~ 500
     
-    <img src="../img/graph2.png">
+
+    <img src="../img/graphs/graph2.png">
+
     
     > **결과 분석**
     > 
@@ -196,18 +200,18 @@ means → how busy the system is.
     > 
     - t ⇒ 0 ~ 100
     
-    <img src="../img/graph3.png">
+    <img src="../img/graphs/graph3.png">
     
     - t ⇒ 0 ~ 500
     
-    <img src="../img/graph4.png">
+    <img src="../img/graphs/graph4.png">
     
 - load_average() 시간과 랜덤 스레드 변화에 따른 변화 분석 (if b is random)
     
     > **랜덤 개수의 스레드가 들어올 경우**
     > 
     
-    <img src="../img/graph5.png">
+    <img src="../img/graphs/graph5.png">
     
 - load_average() 특정 시간 이후로 단일 스레드 실행에 대한 변화 분석
     
@@ -215,11 +219,11 @@ means → how busy the system is.
     > 
     - t ⇒ 0 ~ 100
     
-    <img src="../img/graph6.png">
+    <img src="../img/graphs/graph6.png">
     
     - t ⇒ 0 ~ 500
         
-    <img src="../img/graph7.png">
+    <img src="../img/graphs/graph7.png">
     
     > **결과 분석**
     > 
@@ -228,10 +232,9 @@ means → how busy the system is.
     💡 load_avg는 ready_thread의 개수를 추종하며 decay는 그 load_avg를 추종한다. 그래프를 보면 시간이 지남에 따라 유사한 값을 가지게 되는 것을 볼 수 있다.
     
     </aside>
-        
     
-
-<br>
+    
+<br >
 
 # 구현
 
