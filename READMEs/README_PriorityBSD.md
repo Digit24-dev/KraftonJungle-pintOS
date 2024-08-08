@@ -176,11 +176,11 @@ means → how busy the system is.
     > 
     - t ⇒ 0 ~ 100
     
-    ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/64e3b3b3-972f-4497-bc58-f8af11b9ce10/Untitled.png)
+    <img src="../img/graph1.png">
     
     - t ⇒ 0 ~ 500
     
-    ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/cbbd8dc2-0fa7-4f71-b864-3de767cf18f2/Untitled.png)
+    <img src="../img/graph2.png">
     
     > **결과 분석**
     > 
@@ -196,18 +196,18 @@ means → how busy the system is.
     > 
     - t ⇒ 0 ~ 100
     
-    ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/9b6f70df-5eb4-4155-9668-ec440f0fa7ca/Untitled.png)
+    <img src="../img/graph3.png">
     
     - t ⇒ 0 ~ 500
     
-    ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/8f50addc-01c2-4cfd-a67f-f0ff884b10c7/Untitled.png)
+    <img src="../img/graph4.png">
     
 - load_average() 시간과 랜덤 스레드 변화에 따른 변화 분석 (if b is random)
     
     > **랜덤 개수의 스레드가 들어올 경우**
     > 
     
-    ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/1c3ca71d-136a-46f5-a14a-df48683508f8/Untitled.png)
+    <img src="../img/graph5.png">
     
 - load_average() 특정 시간 이후로 단일 스레드 실행에 대한 변화 분석
     
@@ -215,44 +215,23 @@ means → how busy the system is.
     > 
     - t ⇒ 0 ~ 100
     
-    ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/01b08c72-e113-40ab-822b-75e86c8aaa85/Untitled.png)
+    <img src="../img/graph6.png">
     
     - t ⇒ 0 ~ 500
         
-        ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/cdb803ce-7974-49c0-b49f-0111e0a011ab/Untitled.png)
-        
-        > **결과 분석**
-        > 
-        
-        <aside>
-        💡 load_avg는 ready_thread의 개수를 추종하며 decay는 그 load_avg를 추종한다. 그래프를 보면 시간이 지남에 따라 유사한 값을 가지게 되는 것을 볼 수 있다.
-        
-        </aside>
+    <img src="../img/graph7.png">
+    
+    > **결과 분석**
+    > 
+    
+    <aside>
+    💡 load_avg는 ready_thread의 개수를 추종하며 decay는 그 load_avg를 추종한다. 그래프를 보면 시간이 지남에 따라 유사한 값을 가지게 되는 것을 볼 수 있다.
+    
+    </aside>
         
     
 
----
-
-> **Summary**
-> 
-
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/b11280a0-7c62-46a5-9729-43a7af2d08a9/Untitled.png)
-
-> **fixed point arithmetic**
-> 
-
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/e8639fbf-d28d-4c50-8598-d0bdd6263f67/Untitled.png)
-
-> **Implementation**
-> 
-
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/e8e5a06e-3d7e-4f36-ad13-b3e39fbb9f4f/Untitled.png)
-
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/90964f57-3279-42bd-80b0-170aae371c8c/Untitled.png)
-
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/9a82c1c6-1a06-4a7b-adf4-656ef3ec44fe/Untitled.png)
-
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/2a63785a-b307-48b5-b1cc-bf90640f2229/915195b0-26dc-4985-a433-29833049adc1/Untitled.png)
+<br>
 
 # 구현
 
