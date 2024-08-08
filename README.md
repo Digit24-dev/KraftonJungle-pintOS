@@ -1,3 +1,14 @@
-Brand new pintos for Operating Systems and Lab (CS330), KAIST, by Youngjin Kwon.
 
-The manual is available at https://casys-kaist.github.io/pintos-kaist/.
+# KAIST PintOS Project
+
+## Priority / BSD 4.4 Scheduler
+
+## User Program
+
+### 결과
+<img src="./img/user program.png">
+
+## Virtual Memory
+
+### 결과
+<img src="./img/vm.png">
